@@ -1,0 +1,16 @@
+{
+ "versie": 1,
+ "tankbeurten": [
+  {
+   "id": "t20261014-makro-duiven",
+   "datum": "2026-10-14",
+   "liters": 26.51,
+   "km": 387.7,
+   "prijs": 2.379,
+   "station": "Makro Duiven",
+   "aangemaakt": 1791982800000,
+   "gewijzigd": 1791982800000
+  }
+ ],
+ "verwijderd": {}
+}

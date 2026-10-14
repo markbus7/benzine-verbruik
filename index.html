@@ -220,6 +220,23 @@ input[aria-invalid="true"] { border-color: var(--bad); }
 .empty-log { color: var(--muted); padding: 12px 0; }
 .foot { color: var(--muted); font-size: 0.8rem; text-align: center; }
 
+/* GitHub-koppeling */
+.sync summary {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 16px;
+  cursor: pointer; list-style: none;
+}
+.sync summary::-webkit-details-marker { display: none; }
+.sync summary h2::after { content: "▾"; color: var(--muted); font-size: 0.9rem; margin-left: 8px; }
+.sync[open] summary h2::after { content: "▴"; }
+.sync summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 6px; }
+.sync-body { display: grid; gap: 12px; margin-top: 14px; max-width: 560px; }
+.sync-body ol { margin: 0; padding-left: 1.2em; color: var(--muted); font-size: 0.9rem; display: grid; gap: 4px; }
+.sync-body a { color: var(--accent); font-weight: 600; }
+.sync-body code { font-family: var(--font-data); font-size: 0.85em; background: var(--sunk); padding: 1px 5px; border-radius: 4px; color: var(--ink); }
+.syncstate { font-size: 0.85rem; color: var(--muted); }
+.syncstate[data-state="ok"] { color: var(--good); }
+.syncstate[data-state="err"] { color: var(--bad); }
+
 @media (max-width: 480px) {
   h1 { font-size: 2rem; }
   .kpis { grid-template-columns: 1fr 1fr; }
@@ -312,6 +329,33 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     </section>
   </div>
 
+  <details class="card sync" id="syncCard" hidden>
+    <summary><h2>Synchroniseren met GitHub</h2><span class="syncstate" id="syncState">Niet gekoppeld</span></summary>
+    <div class="sync-body">
+      <p class="hint">Met een token bewaart het Tankboek je tankbeurten in je repository, in het bestand <code>data/tankbeurten.json</code>. Zo zie je op je telefoon en je computer dezelfde gegevens. Dit bestand is voor iedereen leesbaar zolang je repository openbaar is.</p>
+      <ol>
+        <li>Maak op <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a> een fine-grained token.</li>
+        <li>Kies bij Repository access: <b>Only select repositories</b> en alleen deze repository.</li>
+        <li>Zet onder Repository permissions <b>Contents</b> op <b>Read and write</b>.</li>
+        <li>Plak de token hieronder. Hij blijft alleen in deze browser staan.</li>
+      </ol>
+      <div class="field">
+        <label for="g-repo">Repository</label>
+        <input type="text" class="text" id="g-repo" value="markbus7/benzine-verbruik" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="field">
+        <label for="g-token">Token</label>
+        <input type="password" class="text" id="g-token" placeholder="github_pat_…" autocomplete="off" spellcheck="false">
+      </div>
+      <p class="err" id="gErr" role="alert"></p>
+      <div class="btns">
+        <button class="btn primary" type="button" id="gSave">Koppelen en synchroniseren</button>
+        <button class="btn ghost" type="button" id="gNow" hidden>Nu synchroniseren</button>
+        <button class="btn ghost" type="button" id="gOff" hidden>Ontkoppelen</button>
+      </div>
+    </div>
+  </details>
+
   <p class="foot" id="foot"></p>
 </div>
 
@@ -351,20 +395,146 @@ input[aria-invalid="true"] { border-color: var(--bad); }
 
   /* ---------- Opslag: gedeelde database in claude.ai, anders deze browser ---------- */
   const LS_KEY = "tankboek.v1";
-  const state = { mode: "loading", items: [], db: null, metric: "verbruik", editing: null, confirmDel: null, readOnly: false };
+  const LS_TOMB = "tankboek.v1.verwijderd";
+  const LS_GH = "tankboek.v1.github";
+  const DATA_PATH = "data/tankbeurten.json";
+  const BRANCH = "main";
+  const DEFAULT_REPO = "markbus7/benzine-verbruik";
+  const timeFmt = new Intl.DateTimeFormat("nl-NL", { hour: "2-digit", minute: "2-digit" });
+  const state = {
+    mode: "loading", items: [], tomb: {}, db: null, metric: "verbruik", editing: null, confirmDel: null, readOnly: false,
+    gh: { token: "", repo: DEFAULT_REPO, busy: false, last: null, error: "" }
+  };
 
+  function readJson(key, fallback) {
+    try { const v = JSON.parse(localStorage.getItem(key) || "null"); return v == null ? fallback : v; }
+    catch (e) { return fallback; }
+  }
   function readLocal() {
-    try { const v = JSON.parse(localStorage.getItem(LS_KEY) || "[]"); return Array.isArray(v) ? v : []; }
-    catch (e) { return []; }
+    const v = readJson(LS_KEY, []);
+    return Array.isArray(v) ? v : [];
   }
   function writeLocal() {
-    try { localStorage.setItem(LS_KEY, JSON.stringify(state.items)); return true; }
-    catch (e) { return false; }
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(state.items));
+      localStorage.setItem(LS_TOMB, JSON.stringify(state.tomb));
+      return true;
+    } catch (e) { return false; }
   }
   function useLocal() {
     state.mode = "local";
     state.items = readLocal();
+    state.tomb = readJson(LS_TOMB, {});
+    const g = readJson(LS_GH, null);
+    if (g && g.token) { state.gh.token = String(g.token); state.gh.repo = g.repo || DEFAULT_REPO; }
+    el("g-repo").value = state.gh.repo;
     render();
+    syncNow();
+  }
+
+  /* ---------- Synchroniseren met GitHub (alleen in de losse versie) ---------- */
+  const stamp = (e) => e.gewijzigd || e.aangemaakt || 0;
+  function mergeData(a, b) {
+    const tomb = {};
+    [a.tomb, b.tomb].forEach((t) => Object.keys(t || {}).forEach((k) => { tomb[k] = Math.max(tomb[k] || 0, t[k] || 0); }));
+    const byId = new Map();
+    a.items.concat(b.items).forEach((e) => {
+      if (!e || !e.id) return;
+      const cur = byId.get(e.id);
+      if (!cur || stamp(e) > stamp(cur)) byId.set(e.id, e);
+    });
+    const items = [];
+    byId.forEach((e, id) => { if (!(tomb[id] && tomb[id] >= stamp(e))) items.push(e); });
+    return { items, tomb };
+  }
+  const canonItem = (e) => Object.keys(e).sort().map((k) => [k, e[k]]);
+  const canon = (d) => JSON.stringify({
+    i: d.items.slice().sort((x, y) => (x.id < y.id ? -1 : 1)).map(canonItem),
+    t: Object.keys(d.tomb).sort().map((k) => [k, d.tomb[k]])
+  });
+  const b64enc = (str) => { let bin = ""; new TextEncoder().encode(str).forEach((b) => { bin += String.fromCharCode(b); }); return btoa(bin); };
+  const b64dec = (b64) => new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/\s/g, "")), (c) => c.charCodeAt(0)));
+
+  const ghUrl = () => "https://api.github.com/repos/" + state.gh.repo + "/contents/" + DATA_PATH;
+  const ghHeaders = () => ({ Accept: "application/vnd.github+json", Authorization: "Bearer " + state.gh.token, "X-GitHub-Api-Version": "2022-11-28" });
+
+  async function ghPull() {
+    const res = await fetch(ghUrl() + "?ref=" + BRANCH, { headers: ghHeaders(), cache: "no-store" });
+    if (res.status === 404) return { sha: null, items: [], tomb: {} };
+    if (!res.ok) throw { status: res.status };
+    const j = await res.json();
+    let data = {};
+    try { data = JSON.parse(b64dec(j.content)); } catch (e) { data = {}; }
+    return { sha: j.sha, items: Array.isArray(data.tankbeurten) ? data.tankbeurten : [], tomb: data.verwijderd || {} };
+  }
+  async function ghPush(d, sha) {
+    const sorted = d.items.slice().sort((x, y) => (x.datum < y.datum ? -1 : x.datum > y.datum ? 1 : 0));
+    const body = {
+      message: "Tankboek bijgewerkt",
+      content: b64enc(JSON.stringify({ versie: 1, tankbeurten: sorted, verwijderd: d.tomb }, null, 1) + "\n"),
+      branch: BRANCH
+    };
+    if (sha) body.sha = sha;
+    const res = await fetch(ghUrl(), { method: "PUT", headers: Object.assign({ "Content-Type": "application/json" }, ghHeaders()), body: JSON.stringify(body) });
+    if (!res.ok) throw { status: res.status };
+  }
+  async function syncOnce() {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const remote = await ghPull();
+      const merged = mergeData({ items: state.items, tomb: state.tomb }, remote);
+      state.items = merged.items; state.tomb = merged.tomb;
+      writeLocal();
+      if (canon(merged) === canon(remote)) return;
+      try { await ghPush(merged, remote.sha); return; }
+      catch (e) { if (e && (e.status === 409 || e.status === 422)) continue; throw e; }
+    }
+    throw { status: 409 };
+  }
+  function ghError(e) {
+    if (!e || !e.status) return "Geen verbinding met GitHub.";
+    if (e.status === 401) return "De token is ongeldig of verlopen. Maak een nieuwe aan en koppel opnieuw.";
+    if (e.status === 403 || e.status === 404) return "Geen toegang tot " + state.gh.repo + ". Controleer of de token alleen voor deze repository is en Contents op Read and write heeft staan.";
+    if (e.status === 409 || e.status === 422) return "GitHub is net door een ander apparaat bijgewerkt. Probeer het zo nog eens.";
+    return "Synchroniseren mislukte (fout " + e.status + ").";
+  }
+  let syncing = null, resync = false, syncTimer = null;
+  function scheduleSync() {
+    if (!state.gh.token) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(syncNow, 1500);
+  }
+  function syncNow() {
+    if (!state.gh.token || state.mode !== "local") return Promise.resolve();
+    if (syncing) { resync = true; return syncing; }
+    state.gh.busy = true; state.gh.error = "";
+    render();
+    syncing = (async () => {
+      try {
+        do { resync = false; await syncOnce(); } while (resync);
+        state.gh.last = new Date();
+      } catch (e) {
+        state.gh.error = ghError(e);
+      } finally {
+        syncing = null; state.gh.busy = false;
+        render();
+      }
+    })();
+    return syncing;
+  }
+  function renderSync() {
+    const card = el("syncCard");
+    card.hidden = state.mode !== "local";
+    if (card.hidden) return;
+    const g = state.gh, linked = !!g.token;
+    el("gNow").hidden = !linked; el("gOff").hidden = !linked;
+    el("gNow").disabled = g.busy; el("gSave").disabled = g.busy;
+    el("gSave").textContent = linked ? "Wijzigingen opslaan" : "Koppelen en synchroniseren";
+    el("g-token").placeholder = linked ? "Token opgeslagen. Plak een nieuwe om te vervangen." : "github_pat_…";
+    const s = el("syncState");
+    s.textContent = g.busy ? "Synchroniseren…" : g.error ? "Synchroniseren mislukt" : g.last ? "Gesynchroniseerd om " + timeFmt.format(g.last) : linked ? "Gekoppeld" : "Niet gekoppeld";
+    s.dataset.state = g.error ? "err" : g.last && !g.busy ? "ok" : "";
+    el("gErr").textContent = g.error;
+    if (g.error) card.open = true;
   }
   const newId = () => "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
@@ -376,6 +546,7 @@ input[aria-invalid="true"] { border-color: var(--bad); }
       if (i >= 0) state.items[i] = entry; else state.items.push(entry);
       if (!writeLocal()) throw { code: "local_failed" };
       render();
+      scheduleSync();
     }
   }
   async function deleteEntry(id) {
@@ -383,8 +554,10 @@ input[aria-invalid="true"] { border-color: var(--bad); }
       await state.db.collection("tankbeurten").doc(id).delete();
     } else {
       state.items = state.items.filter((x) => x.id !== id);
+      state.tomb[id] = Date.now();
       writeLocal();
       render();
+      scheduleSync();
     }
   }
 
@@ -462,8 +635,12 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     if (state.mode === "loading") { st.textContent = "Laden…"; st.dataset.state = ""; }
     else if (state.mode === "db") { st.textContent = "Opgeslagen in je account"; st.dataset.state = "ok"; }
     else if (state.mode === "dbError") { st.textContent = "Verbinding verbroken, herlaad de pagina"; st.dataset.state = ""; }
+    else if (state.gh.token && state.gh.busy) { st.textContent = "Synchroniseren met GitHub…"; st.dataset.state = "local"; }
+    else if (state.gh.token && state.gh.error) { st.textContent = "Synchroniseren mislukt"; st.dataset.state = "local"; }
+    else if (state.gh.token && state.gh.last) { st.textContent = "Gesynchroniseerd met GitHub"; st.dataset.state = "ok"; }
     else { st.textContent = "Opgeslagen in deze browser"; st.dataset.state = "local"; }
     el("sampleBanner").hidden = !sample;
+    renderSync();
 
     renderKpis(s, rows, state.mode === "loading");
     renderLog(s, sample);
@@ -721,7 +898,8 @@ input[aria-invalid="true"] { border-color: var(--bad); }
       km: Math.round(v.km * 10) / 10,
       prijs: v.prijs > 0 ? Math.round(v.prijs * 1000) / 1000 : null,
       station: fStation.value.trim().slice(0, 60),
-      aangemaakt: old ? old.aangemaakt : Date.now()
+      aangemaakt: old ? old.aangemaakt : Date.now(),
+      gewijzigd: Date.now()
     };
     const btn = el("saveBtn");
     btn.disabled = true;
@@ -781,6 +959,30 @@ input[aria-invalid="true"] { border-color: var(--bad); }
   svg.addEventListener("pointermove", showTip);
   svg.addEventListener("pointerdown", showTip);
   svg.addEventListener("pointerleave", hideTip);
+
+  el("gSave").addEventListener("click", () => {
+    const g = state.gh;
+    const repo = el("g-repo").value.trim().replace(/^https?:\/\/github\.com\//, "").replace(/\.git$/, "").replace(/\/+$/, "");
+    const token = el("g-token").value.trim();
+    if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) { g.error = "Vul de repository in als eigenaar/naam, bijvoorbeeld " + DEFAULT_REPO + "."; renderSync(); return; }
+    if (!token && !g.token) { g.error = "Plak eerst je token."; renderSync(); return; }
+    g.repo = repo;
+    if (token) g.token = token;
+    g.error = ""; g.last = null;
+    try { localStorage.setItem(LS_GH, JSON.stringify({ token: g.token, repo: g.repo })); }
+    catch (e) { g.error = "Deze browser kan de token niet bewaren. Je moet hem na het sluiten opnieuw plakken."; }
+    el("g-token").value = "";
+    syncNow();
+  });
+  el("gNow").addEventListener("click", () => { state.gh.last = null; syncNow(); });
+  el("gOff").addEventListener("click", () => {
+    Object.assign(state.gh, { token: "", last: null, error: "" });
+    try { localStorage.removeItem(LS_GH); } catch (e) { /* niets te doen */ }
+    render();
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && state.gh.token && (!state.gh.last || Date.now() - state.gh.last.getTime() > 60000)) syncNow();
+  });
 
   let rz;
   if ("ResizeObserver" in window) {
