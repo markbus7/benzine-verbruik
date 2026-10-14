@@ -332,16 +332,17 @@ input[aria-invalid="true"] { border-color: var(--bad); }
   <details class="card sync" id="syncCard" hidden>
     <summary><h2>Synchroniseren met GitHub</h2><span class="syncstate" id="syncState">Niet gekoppeld</span></summary>
     <div class="sync-body">
-      <p class="hint">Met een token bewaart het Tankboek je tankbeurten in je repository, in het bestand <code>data/tankbeurten.json</code>. Zo zie je op je telefoon en je computer dezelfde gegevens. Dit bestand is voor iedereen leesbaar zolang je repository openbaar is.</p>
+      <p class="hint">Met een token bewaart het Tankboek je tankbeurten in een eigen repository, in het bestand <code>data/tankbeurten.json</code>. Zo zie je op je telefoon en je computer dezelfde gegevens. Gebruik hiervoor een <b>privé</b>-repository. In een openbare repository kan iedereen dit bestand lezen.</p>
       <ol>
+        <li>Maak een lege, privé <a href="https://github.com/new" target="_blank" rel="noopener">repository</a> aan, bijvoorbeeld <code>benzine-gegevens</code>.</li>
         <li>Maak op <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a> een fine-grained token.</li>
-        <li>Kies bij Repository access: <b>Only select repositories</b> en alleen deze repository.</li>
+        <li>Kies bij Repository access: <b>Only select repositories</b> en alleen die privé-repository.</li>
         <li>Zet onder Repository permissions <b>Contents</b> op <b>Read and write</b>.</li>
         <li>Plak de token hieronder. Hij blijft alleen in deze browser staan.</li>
       </ol>
       <div class="field">
         <label for="g-repo">Repository</label>
-        <input type="text" class="text" id="g-repo" value="markbus7/benzine-verbruik" autocomplete="off" spellcheck="false">
+        <input type="text" class="text" id="g-repo" value="markbus7/benzine-gegevens" autocomplete="off" spellcheck="false">
       </div>
       <div class="field">
         <label for="g-token">Token</label>
@@ -398,8 +399,7 @@ input[aria-invalid="true"] { border-color: var(--bad); }
   const LS_TOMB = "tankboek.v1.verwijderd";
   const LS_GH = "tankboek.v1.github";
   const DATA_PATH = "data/tankbeurten.json";
-  const BRANCH = "main";
-  const DEFAULT_REPO = "markbus7/benzine-verbruik";
+    const DEFAULT_REPO = "markbus7/benzine-gegevens";
   const timeFmt = new Intl.DateTimeFormat("nl-NL", { hour: "2-digit", minute: "2-digit" });
   const state = {
     mode: "loading", items: [], tomb: {}, db: null, metric: "verbruik", editing: null, confirmDel: null, readOnly: false,
@@ -459,7 +459,7 @@ input[aria-invalid="true"] { border-color: var(--bad); }
   const ghHeaders = () => ({ Accept: "application/vnd.github+json", Authorization: "Bearer " + state.gh.token, "X-GitHub-Api-Version": "2022-11-28" });
 
   async function ghPull() {
-    const res = await fetch(ghUrl() + "?ref=" + BRANCH, { headers: ghHeaders(), cache: "no-store" });
+    const res = await fetch(ghUrl(), { headers: ghHeaders(), cache: "no-store" });
     if (res.status === 404) return { sha: null, items: [], tomb: {} };
     if (!res.ok) throw { status: res.status };
     const j = await res.json();
@@ -471,8 +471,7 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     const sorted = d.items.slice().sort((x, y) => (x.datum < y.datum ? -1 : x.datum > y.datum ? 1 : 0));
     const body = {
       message: "Tankboek bijgewerkt",
-      content: b64enc(JSON.stringify({ versie: 1, tankbeurten: sorted, verwijderd: d.tomb }, null, 1) + "\n"),
-      branch: BRANCH
+      content: b64enc(JSON.stringify({ versie: 1, tankbeurten: sorted, verwijderd: d.tomb }, null, 1) + "\n")
     };
     if (sha) body.sha = sha;
     const res = await fetch(ghUrl(), { method: "PUT", headers: Object.assign({ "Content-Type": "application/json" }, ghHeaders()), body: JSON.stringify(body) });
