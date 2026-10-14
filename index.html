@@ -1,0 +1,803 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Tankboek</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: kop met kerncijfers, daarna de verbruikscurve, daaronder invoer (links) en logboek (rechts); op de telefoon alles onder elkaar. */
+:root {
+  --bg: #edf1f0;
+  --surface: #ffffff;
+  --sunk: #e3e9e7;
+  --ink: #12211f;
+  --muted: #5b6c69;
+  --line: #d3dcda;
+  --accent: #0d6b62;
+  --accent-ink: #ffffff;
+  --amber: #b86f00;
+  --good: #2b8248;
+  --good-bg: #e2f2e7;
+  --bad: #bb3f2a;
+  --bad-bg: #f8e4df;
+  --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --font-body: "Barlow", "Segoe UI", system-ui, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1716; --surface: #142220; --sunk: #0f1b1a; --ink: #e3ecea; --muted: #8fa29f;
+    --line: #253532; --accent: #3db3a5; --accent-ink: #062320; --amber: #f0aa3a;
+    --good: #5cc47c; --good-bg: #173322; --bad: #f07d65; --bad-bg: #3a1d17;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1716; --surface: #142220; --sunk: #0f1b1a; --ink: #e3ecea; --muted: #8fa29f;
+  --line: #253532; --accent: #3db3a5; --accent-ink: #062320; --amber: #f0aa3a;
+  --good: #5cc47c; --good-bg: #173322; --bad: #f07d65; --bad-bg: #3a1d17;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.wrap {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 48px;
+  display: grid;
+  gap: 20px;
+}
+.num { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+
+/* Kop */
+header.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 8px 16px; }
+h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 2.4rem;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  margin: 0;
+  text-wrap: balance;
+}
+h1 span { color: var(--accent); }
+.sub { color: var(--muted); margin: 4px 0 0; }
+.sub .car { color: var(--ink); font-weight: 600; }
+input.text { font-family: var(--font-body); padding-right: 12px; }
+.status {
+  font-size: 0.8rem; color: var(--muted);
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px;
+  background: var(--surface);
+}
+.status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.status[data-state="ok"]::before { background: var(--good); }
+.status[data-state="local"]::before { background: var(--amber); }
+
+.banner {
+  border: 1px dashed var(--amber);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--amber) 9%, var(--surface));
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  font-size: 0.92rem;
+}
+.banner strong { color: var(--amber); font-weight: 600; }
+
+/* Kerncijfers */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.kpi {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 16px 16px;
+  display: grid; gap: 4px; align-content: start;
+  min-width: 0;
+}
+.label {
+  font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600;
+}
+.kpi .big { font-family: var(--font-display); font-weight: 600; font-size: 2.3rem; line-height: 1.05; }
+.kpi .big small { font-family: var(--font-body); font-size: 0.85rem; color: var(--muted); font-weight: 500; margin-left: 4px; }
+.kpi .meta { color: var(--muted); font-size: 0.88rem; }
+.kpi.lead { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.kpi.lead .label, .kpi.lead .meta, .kpi.lead .big small { color: color-mix(in srgb, var(--accent-ink) 78%, transparent); }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 0.8rem; font-weight: 600; border-radius: 999px; padding: 1px 8px;
+  white-space: nowrap; justify-self: start;
+}
+.chip.good { color: var(--good); background: var(--good-bg); }
+.chip.bad { color: var(--bad); background: var(--bad-bg); }
+.chip.flat { color: var(--muted); background: var(--sunk); }
+
+/* Kaarten */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; min-width: 0; }
+.card h2 { font-family: var(--font-display); font-weight: 600; font-size: 1.45rem; margin: 0; letter-spacing: 0.01em; }
+.card-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-bottom: 12px; }
+
+.seg { display: inline-flex; background: var(--sunk); border-radius: 8px; padding: 3px; gap: 2px; flex-wrap: wrap; }
+.seg button {
+  font: inherit; font-size: 0.85rem; font-weight: 500;
+  border: 0; background: transparent; color: var(--muted);
+  padding: 5px 12px; border-radius: 6px; cursor: pointer;
+}
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 0.12); }
+.seg button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.chart-wrap { position: relative; }
+.chart-wrap svg { display: block; width: 100%; height: auto; touch-action: pan-y; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.82rem; color: var(--muted); margin-top: 10px; }
+.legend i { display: inline-block; vertical-align: middle; margin-right: 6px; }
+.legend .l-run { width: 18px; height: 3px; background: var(--accent); border-radius: 2px; }
+.legend .l-dot { width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--muted); background: var(--surface); }
+.legend .l-avg { width: 18px; border-top: 2px dashed var(--muted); }
+.tip {
+  position: absolute; pointer-events: none;
+  background: var(--ink); color: var(--bg);
+  border-radius: 8px; padding: 7px 10px; font-size: 0.8rem; line-height: 1.35;
+  white-space: nowrap; transform: translate(-50%, calc(-100% - 12px));
+}
+.tip b { font-weight: 600; }
+.empty-chart { color: var(--muted); padding: 40px 8px; text-align: center; }
+
+/* Invoer + logboek */
+.cols { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 820px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+
+form { display: grid; gap: 12px; }
+.field { display: grid; gap: 4px; }
+.field label { font-weight: 600; font-size: 0.88rem; }
+.field label .opt { color: var(--muted); font-weight: 400; }
+.input-unit { position: relative; }
+.input-unit span {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  color: var(--muted); font-size: 0.85rem; pointer-events: none;
+}
+input {
+  width: 100%; font: inherit; font-family: var(--font-data); font-size: 1rem;
+  color: var(--ink); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 8px; padding: 9px 44px 9px 12px;
+}
+input[type="date"] { padding-right: 12px; font-family: var(--font-body); }
+input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input[aria-invalid="true"] { border-color: var(--bad); }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.preview {
+  background: var(--sunk); border-radius: 8px; padding: 10px 12px;
+  font-size: 0.9rem; color: var(--muted); min-height: 2.6em;
+}
+.preview .num { color: var(--ink); font-weight: 500; }
+.err { color: var(--bad); font-size: 0.85rem; min-height: 1.2em; margin: 0; }
+.hint { color: var(--muted); font-size: 0.82rem; margin: 0; }
+.btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn {
+  font: inherit; font-weight: 600; cursor: pointer;
+  border-radius: 8px; padding: 10px 16px; border: 1px solid transparent;
+}
+.btn.primary { background: var(--accent); color: var(--accent-ink); flex: 1; }
+.btn.primary:hover { filter: brightness(1.07); }
+.btn.ghost { background: transparent; border-color: var(--line); color: var(--ink); }
+.btn:disabled { opacity: 0.55; cursor: wait; }
+
+.log { list-style: none; margin: 0; padding: 0; display: grid; }
+.log li {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px;
+  padding: 12px 0; border-top: 1px solid var(--line);
+}
+.log li:first-child { border-top: 0; padding-top: 2px; }
+.log .when { font-weight: 600; }
+.log .eff { text-align: right; display: flex; align-items: baseline; gap: 8px; justify-content: end; }
+.log .eff .num { font-size: 1.05rem; font-weight: 500; }
+.log .eff small { color: var(--muted); font-size: 0.78rem; }
+.log .det { color: var(--muted); font-size: 0.86rem; display: flex; flex-wrap: wrap; gap: 2px 14px; }
+.log .acts { display: flex; gap: 4px; justify-content: end; align-items: center; }
+.link {
+  font: inherit; font-size: 0.82rem; background: none; border: 0; padding: 2px 6px; border-radius: 6px;
+  color: var(--accent); cursor: pointer; font-weight: 600;
+}
+.link.danger { color: var(--bad); }
+.link:hover { background: var(--sunk); }
+.confirm { font-size: 0.82rem; color: var(--bad); }
+.empty-log { color: var(--muted); padding: 12px 0; }
+.foot { color: var(--muted); font-size: 0.8rem; text-align: center; }
+
+@media (max-width: 480px) {
+  h1 { font-size: 2rem; }
+  .kpis { grid-template-columns: 1fr 1fr; }
+  .kpi { padding: 12px; }
+  .kpi .big { font-size: 1.8rem; }
+  .card { padding: 14px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .kpi .big, .log li { transition: color 0.2s; }
+}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Tank<span>boek</span></h1>
+      <p class="sub"><strong class="car">Mazda 2 Touring · 2007</strong> · Vul na elke tankbeurt in hoeveel je getankt en gereden hebt.</p>
+    </div>
+    <span class="status" id="status" data-state="">Laden…</span>
+  </header>
+
+  <div class="banner" id="sampleBanner" hidden>
+    <strong>Voorbeeldgegevens.</strong> Zo ziet je tankboek eruit met een paar maanden aan tankbeurten. Sla je eerste eigen tankbeurt op en de voorbeelden verdwijnen.
+  </div>
+
+  <section class="kpis" id="kpis" aria-label="Kerncijfers"></section>
+
+  <section class="card" aria-labelledby="chartTitle">
+    <div class="card-head">
+      <h2 id="chartTitle">Verloop</h2>
+      <div class="seg" role="group" aria-label="Wat wil je zien">
+        <button type="button" id="m-verbruik" data-metric="verbruik" aria-pressed="true">Verbruik</button>
+        <button type="button" id="m-prijs" data-metric="prijs" aria-pressed="false">Literprijs</button>
+        <button type="button" id="m-kosten" data-metric="kosten" aria-pressed="false">Kosten / 100 km</button>
+      </div>
+    </div>
+    <div class="chart-wrap" id="chartWrap">
+      <svg id="chart" role="img" aria-label="Grafiek van het verbruik per tankbeurt en het lopend gemiddelde"></svg>
+      <div class="tip" id="tip" hidden></div>
+    </div>
+    <div class="legend" id="legend">
+      <span><i class="l-run"></i>Lopend gemiddelde</span>
+      <span><i class="l-dot"></i>Per tankbeurt</span>
+      <span><i class="l-avg"></i>Gemiddelde laatste 5</span>
+    </div>
+  </section>
+
+  <div class="cols">
+    <section class="card" aria-labelledby="formTitle">
+      <div class="card-head"><h2 id="formTitle">Nieuwe tankbeurt</h2></div>
+      <form id="form" novalidate>
+        <div class="field">
+          <label for="f-datum">Datum</label>
+          <input type="date" id="f-datum" required>
+        </div>
+        <div class="two">
+          <div class="field">
+            <label for="f-liters">Getankt</label>
+            <div class="input-unit"><input type="text" inputmode="decimal" id="f-liters" placeholder="42,5" autocomplete="off"><span>L</span></div>
+          </div>
+          <div class="field">
+            <label for="f-km">Gereden</label>
+            <div class="input-unit"><input type="text" inputmode="decimal" id="f-km" placeholder="650" autocomplete="off"><span>km</span></div>
+          </div>
+        </div>
+        <div class="field">
+          <label for="f-prijs">Literprijs <span class="opt">(optioneel)</span></label>
+          <div class="input-unit"><input type="text" inputmode="decimal" id="f-prijs" placeholder="1,989" autocomplete="off"><span>€/L</span></div>
+        </div>
+        <div class="field">
+          <label for="f-station">Tankstation <span class="opt">(optioneel)</span></label>
+          <input type="text" class="text" id="f-station" placeholder="Makro Duiven" maxlength="60" autocomplete="off">
+        </div>
+        <div class="preview" id="preview" aria-live="polite">Vul liters en kilometers in om je verbruik te zien.</div>
+        <p class="err" id="err" role="alert"></p>
+        <div class="btns">
+          <button class="btn primary" type="submit" id="saveBtn">Tankbeurt opslaan</button>
+          <button class="btn ghost" type="button" id="cancelBtn" hidden>Annuleren</button>
+        </div>
+        <p class="hint">Gereden km = de kilometers sinds de vorige tankbeurt (je dagteller). Tank telkens vol, dan klopt het verbruik per beurt het best.</p>
+      </form>
+    </section>
+
+    <section class="card" aria-labelledby="logTitle">
+      <div class="card-head">
+        <h2 id="logTitle">Logboek</h2>
+        <span class="hint" id="logCount"></span>
+      </div>
+      <ul class="log" id="log"></ul>
+    </section>
+  </div>
+
+  <p class="foot" id="foot"></p>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- Opmaak ---------- */
+  const nf = (d) => new Intl.NumberFormat("nl-NL", { minimumFractionDigits: d, maximumFractionDigits: d });
+  const f0 = nf(0), f1 = nf(1), f2 = nf(2), f3 = nf(3);
+  const eur = new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" });
+  const dayFmt = new Intl.DateTimeFormat("nl-NL", { day: "numeric", month: "short", year: "numeric" });
+  const shortFmt = new Intl.DateTimeFormat("nl-NL", { day: "numeric", month: "short" });
+  const toDate = (iso) => new Date(iso + "T12:00:00");
+  const todayIso = () => {
+    const d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  };
+  function parseNum(s) {
+    s = String(s || "").trim().replace(/\s/g, "").replace(/[€L]|km/gi, "");
+    if (!s) return null;
+    if (s.includes(",") && s.includes(".")) s = s.replace(/\./g, "");
+    s = s.replace(",", ".");
+    const n = Number(s);
+    return Number.isFinite(n) ? n : NaN;
+  }
+  const el = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  /* ---------- Voorbeeld (alleen getoond zolang er niets is opgeslagen) ---------- */
+  const SAMPLE = [
+    ["2026-05-02", 41.2, 618, 2.049], ["2026-05-21", 43.8, 672, 2.019], ["2026-06-09", 40.1, 590, 2.079],
+    ["2026-06-27", 44.6, 701, 1.999], ["2026-07-14", 39.5, 566, 2.059], ["2026-08-01", 42.9, 689, 1.979],
+    ["2026-08-19", 41.7, 655, null], ["2026-09-06", 43.1, 702, 1.959], ["2026-09-24", 38.8, 639, 1.989],
+    ["2026-10-10", 42.4, 688, 1.969]
+  ].map((r, i) => ({ id: "voorbeeld-" + i, datum: r[0], liters: r[1], km: r[2], prijs: r[3], aangemaakt: i }));
+
+  /* ---------- Opslag: gedeelde database in claude.ai, anders deze browser ---------- */
+  const LS_KEY = "tankboek.v1";
+  const state = { mode: "loading", items: [], db: null, metric: "verbruik", editing: null, confirmDel: null, readOnly: false };
+
+  function readLocal() {
+    try { const v = JSON.parse(localStorage.getItem(LS_KEY) || "[]"); return Array.isArray(v) ? v : []; }
+    catch (e) { return []; }
+  }
+  function writeLocal() {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(state.items)); return true; }
+    catch (e) { return false; }
+  }
+  function useLocal() {
+    state.mode = "local";
+    state.items = readLocal();
+    render();
+  }
+  const newId = () => "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+  async function saveEntry(entry) {
+    if (state.mode === "db") {
+      await state.db.collection("tankbeurten").doc(entry.id).set(entry);
+    } else {
+      const i = state.items.findIndex((x) => x.id === entry.id);
+      if (i >= 0) state.items[i] = entry; else state.items.push(entry);
+      if (!writeLocal()) throw { code: "local_failed" };
+      render();
+    }
+  }
+  async function deleteEntry(id) {
+    if (state.mode === "db") {
+      await state.db.collection("tankbeurten").doc(id).delete();
+    } else {
+      state.items = state.items.filter((x) => x.id !== id);
+      writeLocal();
+      render();
+    }
+  }
+
+  function init() {
+    if (!window.claude || typeof window.claude.use !== "function") { useLocal(); return; }
+    render();
+    window.claude.use("db").then((db) => {
+      if (!db) { useLocal(); return; }
+      state.db = db;
+      state.mode = "db";
+      db.collection("tankbeurten").onSnapshot(
+        (snap) => {
+          state.items = snap.docs.map((d) => Object.assign({ id: d.id }, d.data()));
+          render();
+        },
+        () => { state.mode = "dbError"; render(); }
+      );
+    }).catch(useLocal);
+  }
+
+  /* ---------- Berekeningen ---------- */
+  function sorted(items) {
+    return items
+      .filter((x) => x && x.datum && x.liters > 0 && x.km > 0)
+      .slice()
+      .sort((a, b) => (a.datum < b.datum ? -1 : a.datum > b.datum ? 1 : (a.aangemaakt || 0) - (b.aangemaakt || 0)));
+  }
+  const lp100 = (e) => (e.liters / e.km) * 100;
+
+  function stats(rows) {
+    let L = 0, K = 0, pL = 0, pK = 0, cost = 0;
+    const out = rows.map((e) => {
+      L += e.liters; K += e.km;
+      const hasP = e.prijs > 0;
+      if (hasP) { pL += e.liters; pK += e.km; cost += e.liters * e.prijs; }
+      return {
+        e,
+        verbruik: lp100(e),
+        runVerbruik: (L / K) * 100,
+        prijs: hasP ? e.prijs : null,
+        runPrijs: pL ? cost / pL : null,
+        kosten: hasP ? (e.liters * e.prijs / e.km) * 100 : null,
+        runKosten: pK ? (cost / pK) * 100 : null
+      };
+    });
+    const last5 = rows.slice(-5);
+    const l5L = last5.reduce((s, e) => s + e.liters, 0), l5K = last5.reduce((s, e) => s + e.km, 0);
+    return {
+      points: out, L, K, cost, pL, pK,
+      avg: K ? (L / K) * 100 : null,
+      avg5: l5K ? (l5L / l5K) * 100 : null,
+      n5: last5.length,
+      avgPrijs: pL ? cost / pL : null,
+      kosten100: pK ? (cost / pK) * 100 : null
+    };
+  }
+
+  function deltaChip(value, ref, unit, lowerWord, higherWord) {
+    if (value == null || ref == null) return "";
+    const d = value - ref;
+    if (Math.abs(d) < 0.05) return '<span class="chip flat">gelijk aan gemiddeld</span>';
+    const good = d < 0;
+    return '<span class="chip ' + (good ? "good" : "bad") + '">' + (good ? "▼ " : "▲ ") +
+      f1.format(Math.abs(d)) + " " + unit + " " + (good ? lowerWord : higherWord) + "</span>";
+  }
+
+  /* ---------- Weergave ---------- */
+  function render() {
+    const real = sorted(state.items);
+    const sample = state.mode !== "loading" && real.length === 0;
+    const rows = sample ? SAMPLE : real;
+    const s = stats(rows);
+
+    const st = el("status");
+    if (state.mode === "loading") { st.textContent = "Laden…"; st.dataset.state = ""; }
+    else if (state.mode === "db") { st.textContent = "Opgeslagen in je account"; st.dataset.state = "ok"; }
+    else if (state.mode === "dbError") { st.textContent = "Verbinding verbroken, herlaad de pagina"; st.dataset.state = ""; }
+    else { st.textContent = "Opgeslagen in deze browser"; st.dataset.state = "local"; }
+    el("sampleBanner").hidden = !sample;
+
+    renderKpis(s, rows, state.mode === "loading");
+    renderLog(s, sample);
+    renderChart(s);
+    el("foot").textContent = rows.length && !sample
+      ? "Totaal " + f0.format(s.K) + " km gereden en " + f1.format(s.L) + " liter getankt" + (s.cost ? " voor " + eur.format(s.cost) : "") + "."
+      : "";
+  }
+
+  function renderKpis(s, rows, loading) {
+    const dash = '<span class="num">–</span>';
+    const last = s.points[s.points.length - 1];
+    const prev = s.points.length > 1 ? s.points[s.points.length - 2].runVerbruik : null;
+    const lead =
+      '<div class="kpi lead"><span class="label">Gemiddeld verbruik</span>' +
+      '<span class="big num">' + (s.avg != null ? f1.format(s.avg) : "–") + '<small>L/100 km</small></span>' +
+      '<span class="meta">' + (s.avg != null ? "1 op " + f1.format(100 / s.avg) + " · " + rows.length + (rows.length === 1 ? " tankbeurt" : " tankbeurten") : loading ? "Gegevens laden" : "Nog geen tankbeurten") + "</span></div>";
+
+    const lastTile =
+      '<div class="kpi"><span class="label">Laatste tankbeurt</span>' +
+      '<span class="big num">' + (last ? f1.format(last.verbruik) : "–") + '<small>L/100 km</small></span>' +
+      (last ? '<span class="meta">' + shortFmt.format(toDate(last.e.datum)) + " · 1 op " + f1.format(100 / last.verbruik) + "</span>" +
+        deltaChip(last.verbruik, prev ?? s.avg, "L", "zuiniger", "meer") : '<span class="meta">' + dash + "</span>") + "</div>";
+
+    const l5Tile =
+      '<div class="kpi"><span class="label">Laatste ' + (s.n5 || 5) + " gemiddeld</span>" +
+      '<span class="big num">' + (s.avg5 != null ? f1.format(s.avg5) : "–") + '<small>L/100 km</small></span>' +
+      (s.avg5 != null ? '<span class="meta">Trend t.o.v. alles</span>' + deltaChip(s.avg5, s.avg, "L", "zuiniger", "meer") : '<span class="meta">' + dash + "</span>") + "</div>";
+
+    const costTile =
+      '<div class="kpi"><span class="label">Kosten</span>' +
+      '<span class="big num">' + (s.kosten100 != null ? eur.format(s.kosten100).replace(/\s/g, " ") : "–") + "<small>per 100 km</small></span>" +
+      '<span class="meta">' + (s.avgPrijs != null ? "Gem. literprijs € " + f3.format(s.avgPrijs) + " · totaal " + eur.format(s.cost) : "Vul een literprijs in om kosten te zien") + "</span></div>";
+
+    el("kpis").innerHTML = lead + lastTile + l5Tile + costTile;
+  }
+
+  function renderLog(s, sample) {
+    const ul = el("log");
+    el("logCount").textContent = s.points.length ? s.points.length + (s.points.length === 1 ? " tankbeurt" : " tankbeurten") : "";
+    if (state.mode === "loading") { ul.innerHTML = '<li class="empty-log">Tankbeurten laden…</li>'; return; }
+    if (!s.points.length) { ul.innerHTML = '<li class="empty-log">Nog niets ingevuld.</li>'; return; }
+    const html = s.points.slice().reverse().map((p) => {
+      const e = p.e;
+      const d = p.verbruik - s.avg;
+      const cls = Math.abs(d) < 0.05 ? "flat" : d < 0 ? "good" : "bad";
+      const chip = '<span class="chip ' + cls + '">' + (cls === "flat" ? "±0,0" : (d < 0 ? "▼ " : "▲ ") + f1.format(Math.abs(d))) + "</span>";
+      let acts = "";
+      if (!sample && !state.readOnly) {
+        acts = state.confirmDel === e.id
+          ? '<span class="confirm">Verwijderen?</span><button class="link danger" data-act="del-yes" data-id="' + esc(e.id) + '">Ja</button><button class="link" data-act="del-no">Nee</button>'
+          : '<button class="link" data-act="edit" data-id="' + esc(e.id) + '">Wijzig</button><button class="link danger" data-act="del" data-id="' + esc(e.id) + '">Verwijder</button>';
+      }
+      return "<li>" +
+        '<span class="when">' + dayFmt.format(toDate(e.datum)) + "</span>" +
+        '<span class="eff"><span class="num">' + f1.format(p.verbruik) + "</span><small>L/100 km</small>" + chip + "</span>" +
+        '<span class="det"><span class="num">' + f2.format(e.liters) + " L</span>" +
+        '<span class="num">' + f0.format(e.km) + " km</span>" +
+        '<span class="num">1 op ' + f1.format(100 / p.verbruik) + "</span>" +
+        (e.prijs > 0 ? '<span class="num">€ ' + f3.format(e.prijs) + "/L</span>" + '<span class="num">' + eur.format(e.liters * e.prijs) + "</span>" : "") +
+        (e.station ? "<span>" + esc(e.station) + "</span>" : "") +
+        "</span>" +
+        '<span class="acts">' + acts + "</span></li>";
+    }).join("");
+    ul.innerHTML = html;
+  }
+
+  /* ---------- Grafiek ---------- */
+  const METRICS = {
+    verbruik: { val: "verbruik", run: "runVerbruik", fmt: (v) => f1.format(v), unit: "L/100 km", digits: 1, title: "Verbruik per tankbeurt" },
+    prijs: { val: "prijs", run: "runPrijs", fmt: (v) => "€ " + f3.format(v), unit: "per liter", digits: 3, title: "Literprijs" },
+    kosten: { val: "kosten", run: "runKosten", fmt: (v) => eur.format(v), unit: "per 100 km", digits: 2, title: "Kosten per 100 km" }
+  };
+
+  function niceTicks(min, max, count) {
+    if (min === max) { min -= 1; max += 1; }
+    const span = max - min;
+    const raw = span / count;
+    const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((st) => span / st <= count) || 10 * mag;
+    const lo = Math.floor(min / step) * step, hi = Math.ceil(max / step) * step;
+    const ticks = [];
+    for (let v = lo; v <= hi + step / 2; v += step) ticks.push(+v.toFixed(6));
+    return { lo, hi, ticks, step };
+  }
+
+  let chartGeom = null;
+  function renderChart(s) {
+    const hasPrice = s.points.some((p) => p.prijs != null);
+    ["prijs", "kosten"].forEach((m) => { el("m-" + m).disabled = !hasPrice; });
+    if (!hasPrice && state.metric !== "verbruik") state.metric = "verbruik";
+    document.querySelectorAll(".seg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.metric === state.metric)));
+
+    const M = METRICS[state.metric];
+    const pts = s.points.map((p, i) => ({ i, p, v: p[M.val], r: p[M.run] })).filter((x) => x.v != null);
+    const svg = el("chart");
+    const wrap = el("chartWrap");
+    el("tip").hidden = true;
+    const W = Math.max(300, Math.round(wrap.clientWidth || 700));
+    const H = W < 500 ? 230 : 290;
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    svg.setAttribute("aria-label", M.title + " en het lopend gemiddelde");
+
+    if (pts.length < 2) {
+      chartGeom = null;
+      svg.innerHTML = '<text x="' + W / 2 + '" y="' + H / 2 + '" text-anchor="middle" fill="var(--muted)" font-size="14">' +
+        (state.mode === "loading" ? "Laden…" : "Na twee tankbeurten verschijnt hier je verloop.") + "</text>";
+      return;
+    }
+
+    const last5 = pts.slice(-5);
+    const avg5 = state.metric === "verbruik" ? s.avg5 : last5.reduce((a, x) => a + x.v, 0) / last5.length;
+    const vals = pts.flatMap((x) => [x.v, x.r]).concat([avg5]);
+    let mn = Math.min(...vals), mx = Math.max(...vals);
+    const pad = (mx - mn) * 0.12 || mx * 0.05;
+    const t = niceTicks(mn - pad, mx + pad, 5);
+
+    const padL = 52, padR = 14, padT = 14, padB = 30;
+    const iw = W - padL - padR, ih = H - padT - padB;
+    const x = (k) => padL + (pts.length === 1 ? iw / 2 : (k / (pts.length - 1)) * iw);
+    const y = (v) => padT + ih - ((v - t.lo) / (t.hi - t.lo)) * ih;
+
+    let tickDigits = 0;
+    while (tickDigits < 3 && Math.abs(t.step * Math.pow(10, tickDigits) - Math.round(t.step * Math.pow(10, tickDigits))) > 1e-6) tickDigits++;
+    const tf = nf(tickDigits);
+    const fmtTick = (v) => tf.format(v);
+    let g = "";
+    t.ticks.forEach((v) => {
+      g += '<line x1="' + padL + '" x2="' + (W - padR) + '" y1="' + y(v) + '" y2="' + y(v) + '" stroke="var(--line)" stroke-width="1"/>';
+      g += '<text x="' + (padL - 8) + '" y="' + (y(v) + 4) + '" text-anchor="end" fill="var(--muted)" font-size="11" font-family="IBM Plex Mono, monospace">' + fmtTick(v) + "</text>";
+    });
+    // x-labels: maximaal ~5 data
+    const nLab = Math.min(pts.length, W < 500 ? 3 : 5);
+    const labIdx = new Set();
+    for (let k = 0; k < nLab; k++) labIdx.add(Math.round((k / Math.max(1, nLab - 1)) * (pts.length - 1)));
+    labIdx.forEach((k) => {
+      const anchor = k === 0 ? "start" : k === pts.length - 1 ? "end" : "middle";
+      g += '<text x="' + x(k) + '" y="' + (H - 8) + '" text-anchor="' + anchor + '" fill="var(--muted)" font-size="11">' + shortFmt.format(toDate(pts[k].p.e.datum)) + "</text>";
+    });
+
+    // gemiddelde laatste 5
+    g += '<line x1="' + padL + '" x2="' + (W - padR) + '" y1="' + y(avg5) + '" y2="' + y(avg5) + '" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="5 5"/>';
+
+    // vlak onder lopend gemiddelde
+    const runPath = pts.map((pt, k) => (k ? "L" : "M") + x(k).toFixed(1) + " " + y(pt.r).toFixed(1)).join(" ");
+    g += '<path d="' + runPath + " L" + x(pts.length - 1).toFixed(1) + " " + (padT + ih) + " L" + x(0).toFixed(1) + " " + (padT + ih) + ' Z" fill="var(--accent)" fill-opacity="0.08"/>';
+    // lijn per tankbeurt
+    const rawPath = pts.map((pt, k) => (k ? "L" : "M") + x(k).toFixed(1) + " " + y(pt.v).toFixed(1)).join(" ");
+    g += '<path d="' + rawPath + '" fill="none" stroke="var(--muted)" stroke-opacity="0.45" stroke-width="1.25"/>';
+    // lopend gemiddelde
+    g += '<path d="' + runPath + '" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>';
+    // punten: groen onder het lopend gemiddelde van dat moment, rood erboven
+    pts.forEach((pt, k) => {
+      const ref = k > 0 ? pts[k - 1].r : pt.r;
+      const col = Math.abs(pt.v - ref) < 1e-9 ? "var(--muted)" : pt.v < ref ? "var(--good)" : "var(--bad)";
+      g += '<circle cx="' + x(k).toFixed(1) + '" cy="' + y(pt.v).toFixed(1) + '" r="4" fill="var(--surface)" stroke="' + col + '" stroke-width="2.25"/>';
+    });
+    // eindpunt lopend gemiddelde
+    const lk = pts.length - 1;
+    g += '<circle cx="' + x(lk) + '" cy="' + y(pts[lk].r) + '" r="5.5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/>';
+    g += '<line id="guide" x1="0" x2="0" y1="' + padT + '" y2="' + (padT + ih) + '" stroke="var(--ink)" stroke-opacity="0.35" stroke-width="1" visibility="hidden"/>';
+    svg.innerHTML = g;
+    chartGeom = { pts, x, W, padL, padR, y, M };
+  }
+
+  function showTip(evt) {
+    if (!chartGeom) return;
+    const svg = el("chart");
+    const rect = svg.getBoundingClientRect();
+    const scale = chartGeom.W / rect.width;
+    const mx = (evt.clientX - rect.left) * scale;
+    const { pts, x, y, M } = chartGeom;
+    let best = 0, bd = Infinity;
+    pts.forEach((_, k) => { const d = Math.abs(x(k) - mx); if (d < bd) { bd = d; best = k; } });
+    const pt = pts[best];
+    const guide = svg.querySelector("#guide");
+    if (guide) { guide.setAttribute("x1", x(best)); guide.setAttribute("x2", x(best)); guide.setAttribute("visibility", "visible"); }
+    const tip = el("tip");
+    tip.innerHTML = "<b>" + dayFmt.format(toDate(pt.p.e.datum)) + "</b>" + (pt.p.e.station ? " · " + esc(pt.p.e.station) : "") + "<br>" +
+      "Deze beurt: <b>" + M.fmt(pt.v) + "</b> " + M.unit + "<br>" +
+      "Lopend gem.: <b>" + M.fmt(pt.r) + "</b>";
+    tip.hidden = false;
+    const left = x(best) / scale;
+    const top = Math.min(y(pt.v), y(pt.r)) / scale;
+    const tw = tip.offsetWidth;
+    const clamped = Math.max(tw / 2 + 4, Math.min(rect.width - tw / 2 - 4, left));
+    tip.style.left = clamped + "px";
+    tip.style.top = Math.max(top, tip.offsetHeight + 12) + "px";
+  }
+  function hideTip() {
+    el("tip").hidden = true;
+    const guide = el("chart").querySelector("#guide");
+    if (guide) guide.setAttribute("visibility", "hidden");
+  }
+
+  /* ---------- Formulier ---------- */
+  const fDatum = el("f-datum"), fLiters = el("f-liters"), fKm = el("f-km"), fPrijs = el("f-prijs"), fStation = el("f-station");
+  fDatum.value = todayIso();
+
+  function readForm() {
+    return { datum: fDatum.value, liters: parseNum(fLiters.value), km: parseNum(fKm.value), prijs: parseNum(fPrijs.value) };
+  }
+  function updatePreview() {
+    const v = readForm();
+    const pv = el("preview");
+    if (v.liters > 0 && v.km > 0) {
+      const l = (v.liters / v.km) * 100;
+      const avg = stats(sorted(state.items)).avg;
+      let txt = '<span class="num">' + f1.format(l) + "</span> L/100 km · 1 op <span class=\"num\">" + f1.format(100 / l) + "</span>";
+      if (v.prijs > 0) txt += " · <span class=\"num\">" + eur.format(v.liters * v.prijs) + "</span>";
+      if (avg != null && !state.editing) {
+        const d = l - avg;
+        txt += "<br>" + (Math.abs(d) < 0.05 ? "Precies je gemiddelde." : f1.format(Math.abs(d)) + " L/100 km " + (d < 0 ? "zuiniger" : "meer") + " dan je gemiddelde.");
+      }
+      pv.innerHTML = txt;
+    } else {
+      pv.textContent = "Vul liters en kilometers in om je verbruik te zien.";
+    }
+  }
+  [fLiters, fKm, fPrijs].forEach((i) => i.addEventListener("input", () => { i.removeAttribute("aria-invalid"); updatePreview(); }));
+
+  function resetForm() {
+    state.editing = null;
+    fLiters.value = ""; fKm.value = ""; fPrijs.value = ""; fStation.value = "";
+    fDatum.value = todayIso();
+    el("formTitle").textContent = "Nieuwe tankbeurt";
+    el("saveBtn").textContent = "Tankbeurt opslaan";
+    el("cancelBtn").hidden = true;
+    el("err").textContent = "";
+    updatePreview();
+  }
+
+  el("form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const v = readForm();
+    const err = el("err");
+    const bad = [];
+    if (!v.datum) bad.push([fDatum, "Kies een datum."]);
+    if (!(v.liters > 0) || v.liters > 500) bad.push([fLiters, "Vul het aantal getankte liters in, bijvoorbeeld 42,5."]);
+    if (!(v.km > 0) || v.km > 5000) bad.push([fKm, "Vul de gereden kilometers sinds de vorige tankbeurt in."]);
+    if (Number.isNaN(v.prijs) || (v.prijs != null && (v.prijs <= 0 || v.prijs > 10))) bad.push([fPrijs, "De literprijs klopt niet. Gebruik bijvoorbeeld 1,989 of laat het veld leeg."]);
+    [fDatum, fLiters, fKm, fPrijs].forEach((i) => i.removeAttribute("aria-invalid"));
+    if (bad.length) {
+      bad.forEach(([i]) => i.setAttribute("aria-invalid", "true"));
+      err.textContent = bad[0][1];
+      bad[0][0].focus();
+      return;
+    }
+    if (state.mode === "loading") { err.textContent = "Even geduld, je tankboek wordt nog geladen."; return; }
+    const old = state.editing ? state.items.find((x) => x.id === state.editing) : null;
+    const entry = {
+      id: old ? old.id : newId(),
+      datum: v.datum,
+      liters: Math.round(v.liters * 100) / 100,
+      km: Math.round(v.km * 10) / 10,
+      prijs: v.prijs > 0 ? Math.round(v.prijs * 1000) / 1000 : null,
+      station: fStation.value.trim().slice(0, 60),
+      aangemaakt: old ? old.aangemaakt : Date.now()
+    };
+    const btn = el("saveBtn");
+    btn.disabled = true;
+    err.textContent = "";
+    try {
+      await saveEntry(entry);
+      resetForm();
+    } catch (e) {
+      if (e && e.code === "invalid_argument") { err.textContent = "Je kunt in dit tankboek alleen kijken, niet opslaan."; state.readOnly = true; render(); }
+      else if (e && e.code === "quota_exceeded") err.textContent = "Het tankboek is vol. Verwijder oude tankbeurten om ruimte te maken.";
+      else if (e && e.code === "local_failed") err.textContent = "Deze browser staat opslaan niet toe (privévenster?). Je tankbeurt is niet bewaard.";
+      else err.textContent = "Opslaan lukte niet. Controleer je verbinding en probeer het opnieuw.";
+    } finally {
+      btn.disabled = false;
+    }
+  });
+  el("cancelBtn").addEventListener("click", resetForm);
+
+  el("log").addEventListener("click", async (ev) => {
+    const b = ev.target.closest("button[data-act]");
+    if (!b) return;
+    const id = b.dataset.id;
+    const act = b.dataset.act;
+    if (act === "edit") {
+      const e = state.items.find((x) => x.id === id);
+      if (!e) return;
+      state.editing = id;
+      fDatum.value = e.datum;
+      fLiters.value = f2.format(e.liters);
+      fKm.value = String(e.km).replace(".", ",");
+      fPrijs.value = e.prijs > 0 ? f3.format(e.prijs) : "";
+      fStation.value = e.station || "";
+      el("formTitle").textContent = "Tankbeurt wijzigen";
+      el("saveBtn").textContent = "Wijziging opslaan";
+      el("cancelBtn").hidden = false;
+      updatePreview();
+      el("form").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+      fLiters.focus({ preventScroll: true });
+    } else if (act === "del") {
+      state.confirmDel = id; render();
+    } else if (act === "del-no") {
+      state.confirmDel = null; render();
+    } else if (act === "del-yes") {
+      state.confirmDel = null;
+      if (state.editing === id) resetForm();
+      try { await deleteEntry(id); } catch (e) { el("err").textContent = "Verwijderen lukte niet. Probeer het opnieuw."; }
+      render();
+    }
+  });
+
+  document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => {
+    if (b.disabled) return;
+    state.metric = b.dataset.metric;
+    render();
+  }));
+  const svg = el("chart");
+  svg.addEventListener("pointermove", showTip);
+  svg.addEventListener("pointerdown", showTip);
+  svg.addEventListener("pointerleave", hideTip);
+
+  let rz;
+  if ("ResizeObserver" in window) {
+    let lastW = 0;
+    new ResizeObserver((entries) => {
+      const w = Math.round(entries[0].contentRect.width);
+      if (w === lastW) return;
+      lastW = w;
+      clearTimeout(rz);
+      rz = setTimeout(render, 80);
+    }).observe(el("chartWrap"));
+  }
+
+  updatePreview();
+  init();
+})();
+</script>
+
+</body>
+</html>
