@@ -79,6 +79,8 @@ h1 {
 }
 h1 span { color: var(--accent); }
 .sub { color: var(--muted); margin: 4px 0 0; }
+.sub .car { color: var(--ink); font-weight: 600; }
+input.text { font-family: var(--font-body); padding-right: 12px; }
 .status {
   font-size: 0.8rem; color: var(--muted);
   display: inline-flex; align-items: center; gap: 6px;
@@ -234,7 +236,7 @@ input[aria-invalid="true"] { border-color: var(--bad); }
   <header class="top">
     <div>
       <h1>Tank<span>boek</span></h1>
-      <p class="sub">Vul na elke tankbeurt in hoeveel je getankt en gereden hebt.</p>
+      <p class="sub"><strong class="car">Mazda 2 Touring · 2007</strong> · Vul na elke tankbeurt in hoeveel je getankt en gereden hebt.</p>
     </div>
     <span class="status" id="status" data-state="">Laden…</span>
   </header>
@@ -286,6 +288,10 @@ input[aria-invalid="true"] { border-color: var(--bad); }
         <div class="field">
           <label for="f-prijs">Literprijs <span class="opt">(optioneel)</span></label>
           <div class="input-unit"><input type="text" inputmode="decimal" id="f-prijs" placeholder="1,989" autocomplete="off"><span>€/L</span></div>
+        </div>
+        <div class="field">
+          <label for="f-station">Tankstation <span class="opt">(optioneel)</span></label>
+          <input type="text" class="text" id="f-station" placeholder="Makro Duiven" maxlength="60" autocomplete="off">
         </div>
         <div class="preview" id="preview" aria-live="polite">Vul liters en kilometers in om je verbruik te zien.</div>
         <p class="err" id="err" role="alert"></p>
@@ -518,6 +524,7 @@ input[aria-invalid="true"] { border-color: var(--bad); }
         '<span class="num">' + f0.format(e.km) + " km</span>" +
         '<span class="num">1 op ' + f1.format(100 / p.verbruik) + "</span>" +
         (e.prijs > 0 ? '<span class="num">€ ' + f3.format(e.prijs) + "/L</span>" + '<span class="num">' + eur.format(e.liters * e.prijs) + "</span>" : "") +
+        (e.station ? "<span>" + esc(e.station) + "</span>" : "") +
         "</span>" +
         '<span class="acts">' + acts + "</span></li>";
     }).join("");
@@ -635,7 +642,7 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     const guide = svg.querySelector("#guide");
     if (guide) { guide.setAttribute("x1", x(best)); guide.setAttribute("x2", x(best)); guide.setAttribute("visibility", "visible"); }
     const tip = el("tip");
-    tip.innerHTML = "<b>" + dayFmt.format(toDate(pt.p.e.datum)) + "</b><br>" +
+    tip.innerHTML = "<b>" + dayFmt.format(toDate(pt.p.e.datum)) + "</b>" + (pt.p.e.station ? " · " + esc(pt.p.e.station) : "") + "<br>" +
       "Deze beurt: <b>" + M.fmt(pt.v) + "</b> " + M.unit + "<br>" +
       "Lopend gem.: <b>" + M.fmt(pt.r) + "</b>";
     tip.hidden = false;
@@ -653,7 +660,7 @@ input[aria-invalid="true"] { border-color: var(--bad); }
   }
 
   /* ---------- Formulier ---------- */
-  const fDatum = el("f-datum"), fLiters = el("f-liters"), fKm = el("f-km"), fPrijs = el("f-prijs");
+  const fDatum = el("f-datum"), fLiters = el("f-liters"), fKm = el("f-km"), fPrijs = el("f-prijs"), fStation = el("f-station");
   fDatum.value = todayIso();
 
   function readForm() {
@@ -680,7 +687,7 @@ input[aria-invalid="true"] { border-color: var(--bad); }
 
   function resetForm() {
     state.editing = null;
-    fLiters.value = ""; fKm.value = ""; fPrijs.value = "";
+    fLiters.value = ""; fKm.value = ""; fPrijs.value = ""; fStation.value = "";
     fDatum.value = todayIso();
     el("formTitle").textContent = "Nieuwe tankbeurt";
     el("saveBtn").textContent = "Tankbeurt opslaan";
@@ -713,6 +720,7 @@ input[aria-invalid="true"] { border-color: var(--bad); }
       liters: Math.round(v.liters * 100) / 100,
       km: Math.round(v.km * 10) / 10,
       prijs: v.prijs > 0 ? Math.round(v.prijs * 1000) / 1000 : null,
+      station: fStation.value.trim().slice(0, 60),
       aangemaakt: old ? old.aangemaakt : Date.now()
     };
     const btn = el("saveBtn");
@@ -745,6 +753,7 @@ input[aria-invalid="true"] { border-color: var(--bad); }
       fLiters.value = f2.format(e.liters);
       fKm.value = String(e.km).replace(".", ",");
       fPrijs.value = e.prijs > 0 ? f3.format(e.prijs) : "";
+      fStation.value = e.station || "";
       el("formTitle").textContent = "Tankbeurt wijzigen";
       el("saveBtn").textContent = "Wijziging opslaan";
       el("cancelBtn").hidden = false;
