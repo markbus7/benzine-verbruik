@@ -249,6 +249,15 @@ input[aria-invalid="true"] { border-color: var(--bad); }
 .oil-main { margin: 0; font-size: 1.05rem; }
 .oil-main b { font-weight: 600; }
 .oil-sub { margin: 0; color: var(--muted); font-size: 0.88rem; }
+.fl-list { display: grid; gap: 16px; }
+.fl-row { display: grid; gap: 8px; padding-top: 16px; border-top: 1px solid var(--line); }
+.fl-row:first-child { padding-top: 0; border-top: 0; }
+.fl-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+.fl-head h3 { font-family: var(--font-display); font-weight: 600; font-size: 1.2rem; margin: 0; letter-spacing: 0.01em; }
+.fl-row .oil-main { font-size: 0.98rem; }
+.fl-row .oil-actions .field { width: 150px; }
+.fl-row .oil-actions .field.small { width: 112px; }
+.fl-row.due .bar { outline: 1px solid var(--bad); }
 .oil-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin-top: 4px; }
 .oil-actions .field { min-width: 0; width: 170px; }
 .oil-actions .field.right { margin-left: auto; }
@@ -337,6 +346,12 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     </div>
     <p class="err" id="chgErr" role="alert"></p>
     <p class="hint">Je krijgt een melding bij wat het eerst komt, de kilometers of de maanden. 15.000 km of 12 maanden is een gangbare keuze. Controleer wat het onderhoudsboekje van je Mazda zegt en pas het aan. Vul bij een eerdere verversing de echte datum in, dan loopt de tijd goed mee. Kilometers van voor je eerste tankbeurt in het Tankboek tellen niet mee.</p>
+  </section>
+
+  <section class="card oil" id="flCard" aria-labelledby="flTitle">
+    <div class="card-head"><h2 id="flTitle">Vloeistoffen</h2></div>
+    <div class="fl-list" id="flList"></div>
+    <p class="hint">Je krijgt een melding bij wat het eerst komt, de kilometers of de maanden. Zet een veld op 0 om kilometers of maanden uit te zetten. De getallen zijn gangbare voorbeelden. Controleer het onderhoudsboekje van je Mazda en pas ze aan.</p>
   </section>
 
   <section class="card" aria-labelledby="chartTitle">
@@ -717,6 +732,7 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     renderSync();
     renderOil(real);
     renderChange(real);
+    renderFluids(real);
 
     renderKpis(s, rows, state.mode === "loading");
     renderLog(s, sample);
@@ -876,6 +892,86 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     el("chgUndo").hidden = !c.last;
     if (document.activeElement !== el("v-km")) el("v-km").value = String(c.km);
     if (document.activeElement !== el("v-maanden")) el("v-maanden").value = String(c.mnd);
+  }
+
+  /* ---------- Vloeistoffen ---------- */
+  const VLOEISTOFFEN = [
+    { key: "koel", naam: "Koelvloeistof", knop: "Gecontroleerd", werkwoord: "controleren", km: 5000, mnd: 6 },
+    { key: "rem", naam: "Remvloeistof", knop: "Ververst", werkwoord: "verversen", km: 0, mnd: 24 },
+    { key: "ruit", naam: "Ruitensproeiervloeistof", knop: "Gecontroleerd", werkwoord: "controleren", km: 2000, mnd: 3 }
+  ];
+  function fluidCfg(f) {
+    const cfg = state.items.find((x) => x.id === "instelling-vloeistoffen") || {};
+    const km = cfg[f.key + "Km"], mnd = cfg[f.key + "Mnd"];
+    return { km: km != null ? km : f.km, mnd: mnd != null ? mnd : f.mnd };
+  }
+  function trackInfo(real, soort, km, mnd) {
+    const last = checksOf(soort).pop() || null;
+    const since = real.filter((e) => !last || e.datum > last.datum).reduce((s, e) => s + e.km, 0);
+    const dueDate = last && mnd > 0 ? addMonths(last.datum, mnd) : null;
+    const days = (a, b) => Math.round((toDate(b) - toDate(a)) / 86400000);
+    return {
+      last, since, dueDate,
+      kmLeft: km > 0 ? km - since : null,
+      daysLeft: dueDate ? days(todayIso(), dueDate) : null,
+      totalDays: dueDate ? days(last.datum, dueDate) : null
+    };
+  }
+  const daysText = (d) => (d >= 60 ? Math.round(d / 30.4) + " maanden" : d + (d === 1 ? " dag" : " dagen"));
+  function buildFluids() {
+    el("flList").innerHTML = VLOEISTOFFEN.map((f) => {
+      const id = (s) => "fl-" + f.key + "-" + s;
+      return '<div class="fl-row" id="' + id("row") + '">' +
+        '<div class="fl-head"><h3>' + f.naam + '</h3><span class="chip flat" id="' + id("chip") + '">Nog niet vastgelegd</span></div>' +
+        '<div class="bar" id="' + id("bar") + '" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Voortgang ' + f.naam.toLowerCase() + '"><i id="' + id("fill") + '" data-state="good"></i></div>' +
+        '<p class="oil-main" id="' + id("main") + '"></p>' +
+        '<p class="oil-sub" id="' + id("sub") + '"></p>' +
+        '<div class="oil-actions">' +
+        '<div class="field"><label for="' + id("datum") + '">Datum</label><input type="date" id="' + id("datum") + '"></div>' +
+        '<button class="btn primary" type="button" id="' + id("done") + '">' + f.knop + '</button>' +
+        '<button class="btn ghost" type="button" id="' + id("undo") + '" hidden>Ongedaan maken</button>' +
+        '<div class="field small right"><label for="' + id("km") + '">Elke</label><div class="input-unit"><input type="text" inputmode="numeric" id="' + id("km") + '" autocomplete="off"><span>km</span></div></div>' +
+        '<div class="field small"><label for="' + id("mnd") + '">of na</label><div class="input-unit"><input type="text" inputmode="numeric" id="' + id("mnd") + '" autocomplete="off"><span>mnd</span></div></div>' +
+        "</div>" +
+        '<p class="err" id="' + id("err") + '" role="alert"></p></div>';
+    }).join("");
+  }
+  function renderFluids(real) {
+    VLOEISTOFFEN.forEach((f) => {
+      const id = (s) => "fl-" + f.key + "-" + s;
+      const c = fluidCfg(f), t = trackInfo(real, "vloeistof-" + f.key, c.km, c.mnd);
+      const kmDue = t.kmLeft != null && t.kmLeft <= 0, dateDue = t.daysLeft != null && t.daysLeft <= 0;
+      const due = kmDue || dateDue;
+      const soon = !due && ((t.kmLeft != null && t.kmLeft <= c.km * 0.1) || (t.daysLeft != null && t.daysLeft <= 30));
+      const kmPct = t.kmLeft != null ? (t.since / c.km) * 100 : 0;
+      const timePct = t.daysLeft != null && t.totalDays > 0 ? ((t.totalDays - t.daysLeft) / t.totalDays) * 100 : 0;
+      const pct = Math.max(0, Math.min(100, Math.max(kmPct, timePct)));
+      const chip = el(id("chip"));
+      chip.className = "chip " + (due ? "bad" : soon ? "warn" : t.last ? "good" : "flat");
+      chip.textContent = due ? "Nu " + f.werkwoord : soon ? "Binnenkort" : t.last ? "Op tijd" : "Nog niet vastgelegd";
+      el(id("fill")).style.width = pct + "%";
+      el(id("fill")).dataset.state = due ? "bad" : soon ? "warn" : "good";
+      el(id("bar")).setAttribute("aria-valuenow", String(Math.round(pct)));
+      el(id("row")).classList.toggle("due", due);
+      let main;
+      if (due) {
+        const why = [];
+        if (kmDue) why.push(-t.kmLeft < 1 ? "Het interval van " + f0.format(c.km) + " km is bereikt." : "Je bent <b class=\"num\">" + f0.format(-t.kmLeft) + " km</b> over het interval heen.");
+        if (dateDue) why.push("De termijn van " + c.mnd + " maanden liep af op " + dayFmt.format(toDate(t.dueDate)) + ".");
+        main = "Tijd om te " + f.werkwoord + ". " + why.join(" ");
+      } else {
+        const parts = [];
+        if (t.kmLeft != null) parts.push("<b class=\"num\">" + f0.format(t.kmLeft) + " km</b>");
+        if (t.daysLeft != null) parts.push("<b>" + daysText(t.daysLeft) + "</b> (voor " + dayFmt.format(toDate(t.dueDate)) + ")");
+        main = parts.length ? "Nog " + parts.join(" of ") + (parts.length > 1 ? ", wat het eerst komt." : ".") : "Leg vast wanneer je dit voor het laatst deed, dan gaat de tijd lopen.";
+      }
+      el(id("main")).innerHTML = main;
+      el(id("sub")).textContent = (t.last ? "Laatst: " + dayFmt.format(toDate(t.last.datum)) : "Nog niet vastgelegd") +
+        (c.km > 0 ? " · " + f0.format(t.since) + " km " + (t.last ? "sindsdien" : "sinds je eerste tankbeurt") : "");
+      el(id("undo")).hidden = !t.last;
+      if (document.activeElement !== el(id("km"))) el(id("km")).value = String(c.km);
+      if (document.activeElement !== el(id("mnd"))) el(id("mnd")).value = String(c.mnd);
+    });
   }
 
   /* ---------- Grafiek ---------- */
@@ -1202,6 +1298,42 @@ input[aria-invalid="true"] { border-color: var(--bad); }
   }
   settingField("v-km", "olieVerversKm", 1000, 100000, "Kies een aantal kilometers tussen 1.000 en 100.000.");
   settingField("v-maanden", "olieVerversMaanden", 1, 60, "Kies een aantal maanden tussen 1 en 60.");
+
+  buildFluids();
+  function saveFluidSetting(patch, errId) {
+    const cur = state.items.find((x) => x.id === "instelling-vloeistoffen");
+    return oilSave(Object.assign({ id: "instelling-vloeistoffen", soort: "instelling", aangemaakt: Date.now() }, cur, patch, { gewijzigd: Date.now() }), errId);
+  }
+  VLOEISTOFFEN.forEach((f) => {
+    const id = (s) => "fl-" + f.key + "-" + s;
+    el(id("datum")).value = todayIso();
+    el(id("done")).addEventListener("click", async () => {
+      const datum = el(id("datum")).value;
+      if (!datum) { el(id("err")).textContent = "Kies een datum."; return; }
+      const btn = el(id("done"));
+      btn.disabled = true;
+      await oilSave({ id: newId(), soort: "vloeistof-" + f.key, datum, aangemaakt: Date.now(), gewijzigd: Date.now() }, id("err"));
+      btn.disabled = false;
+    });
+    el(id("undo")).addEventListener("click", async () => {
+      const c = fluidCfg(f), t = trackInfo(sorted(state.items), "vloeistof-" + f.key, c.km, c.mnd);
+      if (!t.last) return;
+      try { await deleteEntry(t.last.id); el(id("err")).textContent = ""; }
+      catch (e) { el(id("err")).textContent = "Ongedaan maken lukte niet. Probeer het opnieuw."; }
+    });
+    [["km", "Km", 500, 100000, "Kies 0 of een aantal kilometers tussen 500 en 100.000."], ["mnd", "Mnd", 1, 60, "Kies 0 of een aantal maanden tussen 1 en 60."]].forEach((fld) => {
+      el(id(fld[0])).addEventListener("change", async () => {
+        const inp = el(id(fld[0]));
+        const n = parseInt(inp.value.replace(/\D/g, ""), 10);
+        const c = fluidCfg(f);
+        const cur = fld[0] === "km" ? c.km : c.mnd, other = fld[0] === "km" ? c.mnd : c.km;
+        if (!(n === 0 || (n >= fld[2] && n <= fld[3]))) { el(id("err")).textContent = fld[4]; inp.value = String(cur); return; }
+        if (n === 0 && !(other > 0)) { el(id("err")).textContent = "Laat minstens kilometers of maanden aan staan."; inp.value = String(cur); return; }
+        if (n === cur) { inp.value = String(n); return; }
+        await saveFluidSetting({ [f.key + fld[1]]: n }, id("err"));
+      });
+    });
+  });
 
   el("gSave").addEventListener("click", () => {
     const g = state.gh;
