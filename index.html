@@ -311,6 +311,34 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     <p class="hint">Het Tankboek telt de kilometers van je tankbeurten. Rijd je tussendoor veel, dan loopt de teller pas bij je volgende tankbeurt bij.</p>
   </section>
 
+  <section class="card oil" id="chgCard" aria-labelledby="chgTitle">
+    <div class="card-head">
+      <h2 id="chgTitle">Olie verversen</h2>
+      <span class="chip flat" id="chgChip">Nog niet vastgelegd</span>
+    </div>
+    <div class="bar" id="chgBar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Voortgang tot de volgende olieverversing"><i id="chgFill" data-state="good"></i></div>
+    <p class="oil-main" id="chgMain"></p>
+    <p class="oil-sub" id="chgSub"></p>
+    <div class="oil-actions">
+      <div class="field">
+        <label for="v-datum">Datum verversing</label>
+        <input type="date" id="v-datum">
+      </div>
+      <button class="btn primary" type="button" id="chgDone">Olie ververst</button>
+      <button class="btn ghost" type="button" id="chgUndo" hidden>Laatste verversing ongedaan maken</button>
+      <div class="field right">
+        <label for="v-km">Verversen elke</label>
+        <div class="input-unit"><input type="text" inputmode="numeric" id="v-km" autocomplete="off"><span>km</span></div>
+      </div>
+      <div class="field">
+        <label for="v-maanden">of na</label>
+        <div class="input-unit"><input type="text" inputmode="numeric" id="v-maanden" autocomplete="off"><span>mnd</span></div>
+      </div>
+    </div>
+    <p class="err" id="chgErr" role="alert"></p>
+    <p class="hint">Je krijgt een melding bij wat het eerst komt, de kilometers of de maanden. 15.000 km of 12 maanden is een gangbare keuze. Controleer wat het onderhoudsboekje van je Mazda zegt en pas het aan. Vul bij een eerdere verversing de echte datum in, dan loopt de tijd goed mee. Kilometers van voor je eerste tankbeurt in het Tankboek tellen niet mee.</p>
+  </section>
+
   <section class="card" aria-labelledby="chartTitle">
     <div class="card-head">
       <h2 id="chartTitle">Verloop</h2>
@@ -688,6 +716,7 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     el("sampleBanner").hidden = !sample;
     renderSync();
     renderOil(real);
+    renderChange(real);
 
     renderKpis(s, rows, state.mode === "loading");
     renderLog(s, sample);
@@ -786,6 +815,67 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     el("oilUndo").hidden = !o.last;
     const inp = el("o-interval");
     if (document.activeElement !== inp) inp.value = String(o.interval);
+  }
+
+  /* ---------- Olie verversen ---------- */
+  const VERVERS_KM = 15000, VERVERS_MND = 12;
+  function checksOf(soort) {
+    return state.items
+      .filter((x) => x.soort === soort && x.datum)
+      .sort((a, b) => (a.datum < b.datum ? -1 : a.datum > b.datum ? 1 : (a.aangemaakt || 0) - (b.aangemaakt || 0)));
+  }
+  function addMonths(iso, n) {
+    const p = iso.split("-").map(Number);
+    const t = p[0] * 12 + (p[1] - 1) + n, y = Math.floor(t / 12), m = t % 12;
+    const lastDay = new Date(y, m + 1, 0).getDate();
+    return y + "-" + String(m + 1).padStart(2, "0") + "-" + String(Math.min(p[2], lastDay)).padStart(2, "0");
+  }
+  function changeInfo(real) {
+    const cfg = state.items.find((x) => x.id === "instelling-olie") || {};
+    const km = cfg.olieVerversKm > 0 ? cfg.olieVerversKm : VERVERS_KM;
+    const mnd = cfg.olieVerversMaanden > 0 ? cfg.olieVerversMaanden : VERVERS_MND;
+    const last = checksOf("verversing").pop() || null;
+    const since = real.filter((e) => !last || e.datum > last.datum).reduce((s, e) => s + e.km, 0);
+    const dueDate = last ? addMonths(last.datum, mnd) : null;
+    const days = (a, b) => Math.round((toDate(b) - toDate(a)) / 86400000);
+    return {
+      km, mnd, last, since, kmLeft: km - since, dueDate,
+      daysLeft: dueDate ? days(todayIso(), dueDate) : null,
+      totalDays: dueDate ? days(last.datum, dueDate) : null
+    };
+  }
+  function renderChange(real) {
+    const c = changeInfo(real);
+    const kmDue = c.kmLeft <= 0, dateDue = c.daysLeft != null && c.daysLeft <= 0;
+    const due = kmDue || dateDue;
+    const soon = !due && (c.kmLeft <= c.km * 0.1 || (c.daysLeft != null && c.daysLeft <= 30));
+    const kmPct = (c.since / c.km) * 100;
+    const timePct = c.daysLeft != null && c.totalDays > 0 ? ((c.totalDays - c.daysLeft) / c.totalDays) * 100 : 0;
+    const pct = Math.max(0, Math.min(100, Math.max(kmPct, timePct)));
+    const chip = el("chgChip");
+    chip.className = "chip " + (due ? "bad" : soon ? "warn" : c.last ? "good" : "flat");
+    chip.textContent = due ? "Nu verversen" : soon ? "Binnenkort" : c.last ? "Op tijd" : "Nog niet vastgelegd";
+    el("chgFill").style.width = pct + "%";
+    el("chgFill").dataset.state = due ? "bad" : soon ? "warn" : "good";
+    el("chgBar").setAttribute("aria-valuenow", String(Math.round(pct)));
+    el("chgCard").classList.toggle("due", due);
+    const when = c.daysLeft == null ? "" : c.daysLeft >= 60 ? Math.round(c.daysLeft / 30.4) + " maanden" : c.daysLeft + (c.daysLeft === 1 ? " dag" : " dagen");
+    let main;
+    if (due) {
+      const why = [];
+      if (kmDue) why.push(kmDue && c.kmLeft > -1 ? "Je hebt het interval van " + f0.format(c.km) + " km bereikt." : "Je bent <b class=\"num\">" + f0.format(-c.kmLeft) + " km</b> over het interval heen.");
+      if (dateDue) why.push("De termijn van " + c.mnd + " maanden liep af op " + dayFmt.format(toDate(c.dueDate)) + ".");
+      main = "Tijd om de olie te verversen. " + why.join(" ");
+    } else {
+      main = "Nog <b class=\"num\">" + f0.format(c.kmLeft) + " km</b>" +
+        (c.dueDate ? " of <b>" + when + "</b> (voor " + dayFmt.format(toDate(c.dueDate)) + "), wat het eerst komt." : " tot je de olie moet verversen.");
+    }
+    el("chgMain").innerHTML = main;
+    el("chgSub").textContent = f0.format(c.since) + " km gereden " +
+      (c.last ? "sinds je laatste verversing op " + dayFmt.format(toDate(c.last.datum)) + "." : "sinds je eerste tankbeurt. Vul de datum van je laatste verversing in om ook de tijd te volgen.");
+    el("chgUndo").hidden = !c.last;
+    if (document.activeElement !== el("v-km")) el("v-km").value = String(c.km);
+    if (document.activeElement !== el("v-maanden")) el("v-maanden").value = String(c.mnd);
   }
 
   /* ---------- Grafiek ---------- */
@@ -1041,8 +1131,8 @@ input[aria-invalid="true"] { border-color: var(--bad); }
   svg.addEventListener("pointerleave", hideTip);
 
   el("o-datum").value = todayIso();
-  async function oilSave(entry) {
-    const err = el("oilErr");
+  async function oilSave(entry, errId) {
+    const err = el(errId || "oilErr");
     if (state.mode === "loading") { err.textContent = "Even geduld, je tankboek wordt nog geladen."; return false; }
     try { await saveEntry(entry); err.textContent = ""; return true; }
     catch (e) {
@@ -1077,8 +1167,41 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     }
     if (cur && cur.olieInterval === n) { inp.value = String(n); return; }
     if (!cur && n === OLIE_STANDAARD) { inp.value = String(n); return; }
-    await oilSave({ id: "instelling-olie", soort: "instelling", olieInterval: n, aangemaakt: cur ? cur.aangemaakt : Date.now(), gewijzigd: Date.now() });
+    await saveSetting({ olieInterval: n }, "oilErr");
   });
+  function saveSetting(patch, errId) {
+    const cur = state.items.find((x) => x.id === "instelling-olie");
+    return oilSave(Object.assign({ id: "instelling-olie", soort: "instelling", aangemaakt: Date.now() }, cur, patch, { gewijzigd: Date.now() }), errId);
+  }
+
+  el("v-datum").value = todayIso();
+  el("chgDone").addEventListener("click", async () => {
+    const datum = el("v-datum").value;
+    if (!datum) { el("chgErr").textContent = "Kies de datum van de verversing."; return; }
+    const btn = el("chgDone");
+    btn.disabled = true;
+    await oilSave({ id: newId(), soort: "verversing", datum, aangemaakt: Date.now(), gewijzigd: Date.now() }, "chgErr");
+    btn.disabled = false;
+  });
+  el("chgUndo").addEventListener("click", async () => {
+    const c = changeInfo(sorted(state.items));
+    if (!c.last) return;
+    try { await deleteEntry(c.last.id); el("chgErr").textContent = ""; }
+    catch (e) { el("chgErr").textContent = "Ongedaan maken lukte niet. Probeer het opnieuw."; }
+  });
+  function settingField(id, key, min, max, message) {
+    el(id).addEventListener("change", async () => {
+      const inp = el(id);
+      const n = parseInt(inp.value.replace(/\D/g, ""), 10);
+      const c = changeInfo(sorted(state.items));
+      const current = key === "olieVerversKm" ? c.km : c.mnd;
+      if (!(n >= min && n <= max)) { el("chgErr").textContent = message; inp.value = String(current); return; }
+      if (n === current) { inp.value = String(n); return; }
+      await saveSetting({ [key]: n }, "chgErr");
+    });
+  }
+  settingField("v-km", "olieVerversKm", 1000, 100000, "Kies een aantal kilometers tussen 1.000 en 100.000.");
+  settingField("v-maanden", "olieVerversMaanden", 1, 60, "Kies een aantal maanden tussen 1 en 60.");
 
   el("gSave").addEventListener("click", () => {
     const g = state.gh;
