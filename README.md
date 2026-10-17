@@ -9,6 +9,8 @@ Open `index.html` in je browser. Je ziet dan:
 - een grafiek met het lopend gemiddelde (je "equity curve") voor verbruik, literprijs of kosten per 100 km
 - kosten per 100 km en totaal uitgegeven als je literprijzen invult
 
+- een oliecheck: het Tankboek telt de kilometers van je tankbeurten en waarschuwt als het tijd is om het oliepeil te controleren (standaard na 1.500 km, zelf aan te passen)
+
 In deze losse versie worden je tankbeurten in je browser bewaard (localStorage).
 
 ## Synchroniseren met GitHub

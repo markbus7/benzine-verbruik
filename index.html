@@ -128,6 +128,7 @@ input.text { font-family: var(--font-body); padding-right: 12px; }
 .chip.good { color: var(--good); background: var(--good-bg); }
 .chip.bad { color: var(--bad); background: var(--bad-bg); }
 .chip.flat { color: var(--muted); background: var(--sunk); }
+.chip.warn { color: var(--amber); background: color-mix(in srgb, var(--amber) 14%, var(--surface)); }
 
 /* Kaarten */
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; min-width: 0; }
@@ -237,6 +238,28 @@ input[aria-invalid="true"] { border-color: var(--bad); }
 .syncstate[data-state="ok"] { color: var(--good); }
 .syncstate[data-state="err"] { color: var(--bad); }
 
+/* Oliecheck */
+.oil { display: grid; gap: 10px; }
+.oil .card-head { margin-bottom: 0; }
+.oil.due { border-color: var(--bad); }
+.bar { height: 10px; border-radius: 999px; background: var(--sunk); overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: 999px; background: var(--good); }
+.bar i[data-state="warn"] { background: var(--amber); }
+.bar i[data-state="bad"] { background: var(--bad); }
+.oil-main { margin: 0; font-size: 1.05rem; }
+.oil-main b { font-weight: 600; }
+.oil-sub { margin: 0; color: var(--muted); font-size: 0.88rem; }
+.oil-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin-top: 4px; }
+.oil-actions .field { min-width: 0; width: 170px; }
+.oil-actions .field.right { margin-left: auto; }
+.oil-actions .btn { white-space: nowrap; }
+.oil-actions .btn.primary { flex: 0 1 auto; }
+@media (max-width: 480px) {
+  .oil-actions .field { width: calc(50% - 6px); }
+  .oil-actions .field.right { margin-left: 0; }
+  .oil-actions .btn { flex: 1 1 100%; }
+}
+
 @media (max-width: 480px) {
   h1 { font-size: 2rem; }
   .kpis { grid-template-columns: 1fr 1fr; }
@@ -263,6 +286,30 @@ input[aria-invalid="true"] { border-color: var(--bad); }
   </div>
 
   <section class="kpis" id="kpis" aria-label="Kerncijfers"></section>
+
+  <section class="card oil" id="oilCard" aria-labelledby="oilTitle">
+    <div class="card-head">
+      <h2 id="oilTitle">Oliecheck</h2>
+      <span class="chip good" id="oilChip">Op tijd</span>
+    </div>
+    <div class="bar" id="oilBar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Kilometers sinds de laatste oliecheck"><i id="oilFill" data-state="good"></i></div>
+    <p class="oil-main" id="oilMain"></p>
+    <p class="oil-sub" id="oilSub"></p>
+    <div class="oil-actions">
+      <div class="field">
+        <label for="o-datum">Datum controle</label>
+        <input type="date" id="o-datum">
+      </div>
+      <button class="btn primary" type="button" id="oilDone">Olie gecontroleerd</button>
+      <button class="btn ghost" type="button" id="oilUndo" hidden>Laatste check ongedaan maken</button>
+      <div class="field right">
+        <label for="o-interval">Controleer elke</label>
+        <div class="input-unit"><input type="text" inputmode="numeric" id="o-interval" autocomplete="off"><span>km</span></div>
+      </div>
+    </div>
+    <p class="err" id="oilErr" role="alert"></p>
+    <p class="hint">Het Tankboek telt de kilometers van je tankbeurten. Rijd je tussendoor veel, dan loopt de teller pas bij je volgende tankbeurt bij.</p>
+  </section>
 
   <section class="card" aria-labelledby="chartTitle">
     <div class="card-head">
@@ -640,6 +687,7 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     else { st.textContent = "Opgeslagen in deze browser"; st.dataset.state = "local"; }
     el("sampleBanner").hidden = !sample;
     renderSync();
+    renderOil(real);
 
     renderKpis(s, rows, state.mode === "loading");
     renderLog(s, sample);
@@ -705,6 +753,39 @@ input[aria-invalid="true"] { border-color: var(--bad); }
         '<span class="acts">' + acts + "</span></li>";
     }).join("");
     ul.innerHTML = html;
+  }
+
+  /* ---------- Oliecheck ---------- */
+  const OLIE_STANDAARD = 1500;
+  function oilInfo(real) {
+    const cfg = state.items.find((x) => x.id === "instelling-olie");
+    const interval = cfg && cfg.olieInterval > 0 ? cfg.olieInterval : OLIE_STANDAARD;
+    const checks = state.items
+      .filter((x) => x.soort === "olie" && x.datum)
+      .sort((a, b) => (a.datum < b.datum ? -1 : a.datum > b.datum ? 1 : (a.aangemaakt || 0) - (b.aangemaakt || 0)));
+    const last = checks[checks.length - 1] || null;
+    const since = real.filter((e) => !last || e.datum > last.datum).reduce((s, e) => s + e.km, 0);
+    return { interval, last, since, left: interval - since };
+  }
+  function renderOil(real) {
+    const o = oilInfo(real);
+    const pct = Math.max(0, Math.min(100, (o.since / o.interval) * 100));
+    const due = o.left <= 0, soon = !due && o.left <= o.interval * 0.2;
+    const chip = el("oilChip");
+    chip.className = "chip " + (due ? "bad" : soon ? "warn" : "good");
+    chip.textContent = due ? "Nu controleren" : soon ? "Binnenkort" : "Op tijd";
+    el("oilFill").style.width = pct + "%";
+    el("oilFill").dataset.state = due ? "bad" : soon ? "warn" : "good";
+    el("oilBar").setAttribute("aria-valuenow", String(Math.round(pct)));
+    el("oilCard").classList.toggle("due", due);
+    el("oilMain").innerHTML = due
+      ? (-o.left < 1 ? "Het is tijd voor een oliecheck." : "Je bent <b class=\"num\">" + f0.format(-o.left) + " km</b> over je oliecheck heen.") + " Controleer het oliepeil bij je volgende stop."
+      : "Nog <b class=\"num\">" + f0.format(o.left) + " km</b> tot je volgende oliecheck.";
+    el("oilSub").textContent = f0.format(o.since) + " van " + f0.format(o.interval) + " km gereden " +
+      (o.last ? "sinds je laatste check op " + dayFmt.format(toDate(o.last.datum)) : "sinds je eerste tankbeurt") + ".";
+    el("oilUndo").hidden = !o.last;
+    const inp = el("o-interval");
+    if (document.activeElement !== inp) inp.value = String(o.interval);
   }
 
   /* ---------- Grafiek ---------- */
@@ -958,6 +1039,46 @@ input[aria-invalid="true"] { border-color: var(--bad); }
   svg.addEventListener("pointermove", showTip);
   svg.addEventListener("pointerdown", showTip);
   svg.addEventListener("pointerleave", hideTip);
+
+  el("o-datum").value = todayIso();
+  async function oilSave(entry) {
+    const err = el("oilErr");
+    if (state.mode === "loading") { err.textContent = "Even geduld, je tankboek wordt nog geladen."; return false; }
+    try { await saveEntry(entry); err.textContent = ""; return true; }
+    catch (e) {
+      err.textContent = e && e.code === "invalid_argument" ? "Je kunt in dit tankboek alleen kijken, niet opslaan."
+        : e && e.code === "local_failed" ? "Deze browser staat opslaan niet toe (privévenster?). Je oliecheck is niet bewaard."
+        : "Opslaan lukte niet. Controleer je verbinding en probeer het opnieuw.";
+      return false;
+    }
+  }
+  el("oilDone").addEventListener("click", async () => {
+    const datum = el("o-datum").value;
+    if (!datum) { el("oilErr").textContent = "Kies de datum van de controle."; return; }
+    const btn = el("oilDone");
+    btn.disabled = true;
+    await oilSave({ id: newId(), soort: "olie", datum, aangemaakt: Date.now(), gewijzigd: Date.now() });
+    btn.disabled = false;
+  });
+  el("oilUndo").addEventListener("click", async () => {
+    const o = oilInfo(sorted(state.items));
+    if (!o.last) return;
+    try { await deleteEntry(o.last.id); el("oilErr").textContent = ""; }
+    catch (e) { el("oilErr").textContent = "Ongedaan maken lukte niet. Probeer het opnieuw."; }
+  });
+  el("o-interval").addEventListener("change", async () => {
+    const inp = el("o-interval");
+    const n = parseInt(inp.value.replace(/\D/g, ""), 10);
+    const cur = state.items.find((x) => x.id === "instelling-olie");
+    if (!(n >= 100 && n <= 50000)) {
+      el("oilErr").textContent = "Kies een aantal kilometers tussen 100 en 50.000.";
+      inp.value = String(oilInfo(sorted(state.items)).interval);
+      return;
+    }
+    if (cur && cur.olieInterval === n) { inp.value = String(n); return; }
+    if (!cur && n === OLIE_STANDAARD) { inp.value = String(n); return; }
+    await oilSave({ id: "instelling-olie", soort: "instelling", olieInterval: n, aangemaakt: cur ? cur.aangemaakt : Date.now(), gewijzigd: Date.now() });
+  });
 
   el("gSave").addEventListener("click", () => {
     const g = state.gh;
