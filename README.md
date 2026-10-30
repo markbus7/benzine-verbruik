@@ -4,6 +4,7 @@
 
 Open `index.html` in je browser. Je ziet dan:
 
+- bovenaan het formulier voor een nieuwe tankbeurt, met snelkeuzeknoppen voor je tankstation (Makro Duiven staat er altijd, daarna je meest gebruikte stations) en de literprijs van de vorige keer bij dat station
 - verbruik per tankbeurt in L/100 km en "1 op X"
 - gemiddeld verbruik, laatste tankbeurt en het gemiddelde van de laatste 5
 - een grafiek met het lopend gemiddelde (je "equity curve") voor verbruik, literprijs of kosten per 100 km
@@ -12,6 +13,8 @@ Open `index.html` in je browser. Je ziet dan:
 - een oliecheck: het Tankboek telt de kilometers van je tankbeurten en waarschuwt als het tijd is om het oliepeil te controleren (standaard na 1.500 km, zelf aan te passen)
 - olie verversen: houdt de laatste verversing bij en waarschuwt na een instelbaar aantal kilometers of maanden, wat het eerst komt (standaard 15.000 km of 12 maanden)
 - vloeistoffen: koelvloeistof, remvloeistof en ruitensproeiervloeistof, elk met een eigen waarschuwing na een instelbaar aantal kilometers en/of maanden (een veld op 0 zet dat deel uit)
+- tabblad **Reiskosten**: vul de kilometers in, of zoek de afstand op tussen twee plaatsen, en zie wat een enkele reis en een retour kosten, op basis van je eigen verbruik en literprijs. Het opzoeken gebruikt OpenStreetMap (Nominatim) en OSRM en werkt alleen in de losse versie op GitHub Pages
+- gemaakt voor de telefoon: tabbladen onderaan binnen duimbereik, grote knoppen en velden, onderhoud dat inklapt en vanzelf opent als er iets moet, een logboek met de laatste 5 tankbeurten en een bevestiging na het opslaan
 
 In deze losse versie worden je tankbeurten in je browser bewaard (localStorage).
 

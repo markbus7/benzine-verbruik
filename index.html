@@ -80,6 +80,42 @@ h1 {
 h1 span { color: var(--accent); }
 .sub { color: var(--muted); margin: 4px 0 0; }
 .sub .car { color: var(--ink); font-weight: 600; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips button {
+  font: inherit; font-size: 0.9rem; font-weight: 500; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  padding: 6px 14px; border-radius: 999px;
+}
+.chips button:hover { border-color: var(--accent); }
+.chips button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.chips button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.prijsfill { justify-self: start; text-align: left; padding-left: 0; }
+
+/* Tabbladen en reiskosten */
+.panel { display: grid; gap: 20px; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+.tabs button {
+  font-family: var(--font-display); font-weight: 600; font-size: 1.3rem; letter-spacing: 0.01em;
+  background: none; border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px;
+  color: var(--muted); padding: 6px 14px 4px; cursor: pointer;
+}
+.tabs button:hover { color: var(--ink); }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
+.trip-form { display: grid; gap: 14px; }
+.trip-grid {
+  display: grid; gap: 20px; align-items: start;
+  grid-template-columns: minmax(0, 340px) minmax(0, 1fr);
+  grid-template-areas: "route result" "calc calc";
+}
+.trip-route { grid-area: route; }
+.trip-result { grid-area: result; min-width: 0; }
+.trip-calc { grid-area: calc; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+@media (max-width: 820px) {
+  .trip-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "route" "result" "calc"; }
+}
+.trip-sum { color: var(--muted); font-size: 0.9rem; margin: 14px 0 0; }
+.trip-sum .num { color: var(--ink); }
 input.text { font-family: var(--font-body); padding-right: 12px; }
 .status {
   font-size: 0.8rem; color: var(--muted);
@@ -279,6 +315,42 @@ input[aria-invalid="true"] { border-color: var(--bad); }
 @media (prefers-reduced-motion: no-preference) {
   .kpi .big, .log li { transition: color 0.2s; }
 }
+
+/* Telefoon en aanraking */
+input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
+.btn { min-height: 46px; padding: 12px 18px; }
+.chips button { min-height: 40px; padding: 8px 16px; }
+.seg button { min-height: 38px; padding: 8px 14px; }
+.link { min-height: 36px; padding: 8px 10px; }
+.tabs button { min-height: 44px; }
+#logMore { justify-self: stretch; width: 100%; margin-top: 8px; }
+.fold-head { cursor: pointer; user-select: none; gap: 6px 10px; min-height: 44px; align-items: center; }
+.fold-head h2::after { content: "▸"; color: var(--muted); font-size: 0.9rem; margin-left: 8px; }
+.fold-head[aria-expanded="true"] h2::after { content: "▾"; }
+.fold-head:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 6px; }
+.fold-sum { color: var(--muted); font-size: 0.9rem; margin-left: auto; }
+.fold { display: grid; gap: 10px; margin-top: 2px; }
+.log li { padding: 14px 0; }
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%); z-index: 30;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  background: var(--ink); color: var(--bg); padding: 12px 18px; border-radius: 10px;
+  font-size: 0.95rem; max-width: calc(100% - 32px); box-shadow: 0 4px 16px rgb(0 0 0 / 0.25);
+}
+@media (max-width: 640px) {
+  .wrap { padding-block: 16px calc(92px + env(safe-area-inset-bottom, 0px)); gap: 16px; }
+  .toast { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+  .tabs {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+    background: var(--surface); border-top: 1px solid var(--line); border-bottom: 0;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .tabs button { font-size: 1.2rem; min-height: 56px; border-bottom: 0; border-top: 3px solid transparent; margin-bottom: 0; }
+  .tabs button[aria-selected="true"] { border-top-color: var(--accent); }
+  .card { padding: 16px; }
+}
 </style>
 
 <div class="wrap">
@@ -290,89 +362,17 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     <span class="status" id="status" data-state="">Laden…</span>
   </header>
 
+  <div class="tabs" role="tablist" aria-label="Onderdeel">
+    <button type="button" role="tab" id="tab-tank" aria-selected="true" aria-controls="panel-tank">Tankboek</button>
+    <button type="button" role="tab" id="tab-reis" aria-selected="false" aria-controls="panel-reis" tabindex="-1">Reiskosten</button>
+  </div>
+
+  <div class="panel" id="panel-tank" role="tabpanel" aria-labelledby="tab-tank">
   <div class="banner" id="sampleBanner" hidden>
     <strong>Voorbeeldgegevens.</strong> Zo ziet je tankboek eruit met een paar maanden aan tankbeurten. Sla je eerste eigen tankbeurt op en de voorbeelden verdwijnen.
   </div>
 
   <section class="kpis" id="kpis" aria-label="Kerncijfers"></section>
-
-  <section class="card oil" id="oilCard" aria-labelledby="oilTitle">
-    <div class="card-head">
-      <h2 id="oilTitle">Oliecheck</h2>
-      <span class="chip good" id="oilChip">Op tijd</span>
-    </div>
-    <div class="bar" id="oilBar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Kilometers sinds de laatste oliecheck"><i id="oilFill" data-state="good"></i></div>
-    <p class="oil-main" id="oilMain"></p>
-    <p class="oil-sub" id="oilSub"></p>
-    <div class="oil-actions">
-      <div class="field">
-        <label for="o-datum">Datum controle</label>
-        <input type="date" id="o-datum">
-      </div>
-      <button class="btn primary" type="button" id="oilDone">Olie gecontroleerd</button>
-      <button class="btn ghost" type="button" id="oilUndo" hidden>Laatste check ongedaan maken</button>
-      <div class="field right">
-        <label for="o-interval">Controleer elke</label>
-        <div class="input-unit"><input type="text" inputmode="numeric" id="o-interval" autocomplete="off"><span>km</span></div>
-      </div>
-    </div>
-    <p class="err" id="oilErr" role="alert"></p>
-    <p class="hint">Het Tankboek telt de kilometers van je tankbeurten. Rijd je tussendoor veel, dan loopt de teller pas bij je volgende tankbeurt bij.</p>
-  </section>
-
-  <section class="card oil" id="chgCard" aria-labelledby="chgTitle">
-    <div class="card-head">
-      <h2 id="chgTitle">Olie verversen</h2>
-      <span class="chip flat" id="chgChip">Nog niet vastgelegd</span>
-    </div>
-    <div class="bar" id="chgBar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Voortgang tot de volgende olieverversing"><i id="chgFill" data-state="good"></i></div>
-    <p class="oil-main" id="chgMain"></p>
-    <p class="oil-sub" id="chgSub"></p>
-    <div class="oil-actions">
-      <div class="field">
-        <label for="v-datum">Datum verversing</label>
-        <input type="date" id="v-datum">
-      </div>
-      <button class="btn primary" type="button" id="chgDone">Olie ververst</button>
-      <button class="btn ghost" type="button" id="chgUndo" hidden>Laatste verversing ongedaan maken</button>
-      <div class="field right">
-        <label for="v-km">Verversen elke</label>
-        <div class="input-unit"><input type="text" inputmode="numeric" id="v-km" autocomplete="off"><span>km</span></div>
-      </div>
-      <div class="field">
-        <label for="v-maanden">of na</label>
-        <div class="input-unit"><input type="text" inputmode="numeric" id="v-maanden" autocomplete="off"><span>mnd</span></div>
-      </div>
-    </div>
-    <p class="err" id="chgErr" role="alert"></p>
-    <p class="hint">Je krijgt een melding bij wat het eerst komt, de kilometers of de maanden. 15.000 km of 12 maanden is een gangbare keuze. Controleer wat het onderhoudsboekje van je Mazda zegt en pas het aan. Vul bij een eerdere verversing de echte datum in, dan loopt de tijd goed mee. Kilometers van voor je eerste tankbeurt in het Tankboek tellen niet mee.</p>
-  </section>
-
-  <section class="card oil" id="flCard" aria-labelledby="flTitle">
-    <div class="card-head"><h2 id="flTitle">Vloeistoffen</h2></div>
-    <div class="fl-list" id="flList"></div>
-    <p class="hint">Je krijgt een melding bij wat het eerst komt, de kilometers of de maanden. Zet een veld op 0 om kilometers of maanden uit te zetten. De getallen zijn gangbare voorbeelden. Controleer het onderhoudsboekje van je Mazda en pas ze aan.</p>
-  </section>
-
-  <section class="card" aria-labelledby="chartTitle">
-    <div class="card-head">
-      <h2 id="chartTitle">Verloop</h2>
-      <div class="seg" role="group" aria-label="Wat wil je zien">
-        <button type="button" id="m-verbruik" data-metric="verbruik" aria-pressed="true">Verbruik</button>
-        <button type="button" id="m-prijs" data-metric="prijs" aria-pressed="false">Literprijs</button>
-        <button type="button" id="m-kosten" data-metric="kosten" aria-pressed="false">Kosten / 100 km</button>
-      </div>
-    </div>
-    <div class="chart-wrap" id="chartWrap">
-      <svg id="chart" role="img" aria-label="Grafiek van het verbruik per tankbeurt en het lopend gemiddelde"></svg>
-      <div class="tip" id="tip" hidden></div>
-    </div>
-    <div class="legend" id="legend">
-      <span><i class="l-run"></i>Lopend gemiddelde</span>
-      <span><i class="l-dot"></i>Per tankbeurt</span>
-      <span><i class="l-avg"></i>Gemiddelde laatste 5</span>
-    </div>
-  </section>
 
   <div class="cols">
     <section class="card" aria-labelledby="formTitle">
@@ -395,10 +395,12 @@ input[aria-invalid="true"] { border-color: var(--bad); }
         <div class="field">
           <label for="f-prijs">Literprijs <span class="opt">(optioneel)</span></label>
           <div class="input-unit"><input type="text" inputmode="decimal" id="f-prijs" placeholder="1,989" autocomplete="off"><span>€/L</span></div>
+          <button type="button" class="link prijsfill" id="prijsFill" hidden></button>
         </div>
         <div class="field">
           <label for="f-station">Tankstation <span class="opt">(optioneel)</span></label>
-          <input type="text" class="text" id="f-station" placeholder="Makro Duiven" maxlength="60" autocomplete="off">
+          <div class="chips" id="stationChips" role="group" aria-label="Snelkeuze tankstation"></div>
+          <input type="text" class="text" id="f-station" placeholder="Of typ een ander station" maxlength="60" autocomplete="off">
         </div>
         <div class="preview" id="preview" aria-live="polite">Vul liters en kilometers in om je verbruik te zien.</div>
         <p class="err" id="err" role="alert"></p>
@@ -410,12 +412,140 @@ input[aria-invalid="true"] { border-color: var(--bad); }
       </form>
     </section>
 
-    <section class="card" aria-labelledby="logTitle">
+    <section class="card" aria-labelledby="chartTitle">
+    <div class="card-head">
+      <h2 id="chartTitle">Verloop</h2>
+      <div class="seg" role="group" aria-label="Wat wil je zien">
+        <button type="button" id="m-verbruik" data-metric="verbruik" aria-pressed="true">Verbruik</button>
+        <button type="button" id="m-prijs" data-metric="prijs" aria-pressed="false">Literprijs</button>
+        <button type="button" id="m-kosten" data-metric="kosten" aria-pressed="false">Kosten / 100 km</button>
+      </div>
+    </div>
+    <div class="chart-wrap" id="chartWrap">
+      <svg id="chart" role="img" aria-label="Grafiek van het verbruik per tankbeurt en het lopend gemiddelde"></svg>
+      <div class="tip" id="tip" hidden></div>
+    </div>
+    <div class="legend" id="legend">
+      <span><i class="l-run"></i>Lopend gemiddelde</span>
+      <span><i class="l-dot"></i>Per tankbeurt</span>
+      <span><i class="l-avg"></i>Gemiddelde laatste 5</span>
+    </div>
+  </section>
+  </div>
+
+  <section class="card oil" id="oilCard" aria-labelledby="oilTitle">
+    <div class="card-head fold-head" id="oilHead" role="button" tabindex="0" aria-expanded="false" aria-controls="oilFold">
+      <h2 id="oilTitle">Oliecheck</h2><span class="fold-sum" id="oilSum"></span>
+      <span class="chip good" id="oilChip">Op tijd</span>
+    </div>
+    <div class="fold" id="oilFold" hidden>
+    <div class="bar" id="oilBar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Kilometers sinds de laatste oliecheck"><i id="oilFill" data-state="good"></i></div>
+    <p class="oil-main" id="oilMain"></p>
+    <p class="oil-sub" id="oilSub"></p>
+    <div class="oil-actions">
+      <div class="field">
+        <label for="o-datum">Datum controle</label>
+        <input type="date" id="o-datum">
+      </div>
+      <button class="btn primary" type="button" id="oilDone">Olie gecontroleerd</button>
+      <button class="btn ghost" type="button" id="oilUndo" hidden>Laatste check ongedaan maken</button>
+      <div class="field right">
+        <label for="o-interval">Controleer elke</label>
+        <div class="input-unit"><input type="text" inputmode="numeric" id="o-interval" autocomplete="off"><span>km</span></div>
+      </div>
+    </div>
+    <p class="err" id="oilErr" role="alert"></p>
+    <p class="hint">Het Tankboek telt de kilometers van je tankbeurten. Rijd je tussendoor veel, dan loopt de teller pas bij je volgende tankbeurt bij.</p>
+  </div>
+  </section>
+
+  <section class="card oil" id="chgCard" aria-labelledby="chgTitle">
+    <div class="card-head fold-head" id="chgHead" role="button" tabindex="0" aria-expanded="false" aria-controls="chgFold">
+      <h2 id="chgTitle">Olie verversen</h2><span class="fold-sum" id="chgSum"></span>
+      <span class="chip flat" id="chgChip">Nog niet vastgelegd</span>
+    </div>
+    <div class="fold" id="chgFold" hidden>
+    <div class="bar" id="chgBar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Voortgang tot de volgende olieverversing"><i id="chgFill" data-state="good"></i></div>
+    <p class="oil-main" id="chgMain"></p>
+    <p class="oil-sub" id="chgSub"></p>
+    <div class="oil-actions">
+      <div class="field">
+        <label for="v-datum">Datum verversing</label>
+        <input type="date" id="v-datum">
+      </div>
+      <button class="btn primary" type="button" id="chgDone">Olie ververst</button>
+      <button class="btn ghost" type="button" id="chgUndo" hidden>Laatste verversing ongedaan maken</button>
+      <div class="field right">
+        <label for="v-km">Verversen elke</label>
+        <div class="input-unit"><input type="text" inputmode="numeric" id="v-km" autocomplete="off"><span>km</span></div>
+      </div>
+      <div class="field">
+        <label for="v-maanden">of na</label>
+        <div class="input-unit"><input type="text" inputmode="numeric" id="v-maanden" autocomplete="off"><span>mnd</span></div>
+      </div>
+    </div>
+    <p class="err" id="chgErr" role="alert"></p>
+    <p class="hint">Je krijgt een melding bij wat het eerst komt, de kilometers of de maanden. 15.000 km of 12 maanden is een gangbare keuze. Controleer wat het onderhoudsboekje van je Mazda zegt en pas het aan. Vul bij een eerdere verversing de echte datum in, dan loopt de tijd goed mee. Kilometers van voor je eerste tankbeurt in het Tankboek tellen niet mee.</p>
+  </div>
+  </section>
+
+  <section class="card oil" id="flCard" aria-labelledby="flTitle">
+    <div class="card-head fold-head" id="flHead" role="button" tabindex="0" aria-expanded="false" aria-controls="flFold"><h2 id="flTitle">Vloeistoffen</h2><span class="chip flat" id="flChip">Alles op tijd</span></div>
+    <div class="fold" id="flFold" hidden>
+    <div class="fl-list" id="flList"></div>
+    <p class="hint">Je krijgt een melding bij wat het eerst komt, de kilometers of de maanden. Zet een veld op 0 om kilometers of maanden uit te zetten. De getallen zijn gangbare voorbeelden. Controleer het onderhoudsboekje van je Mazda en pas ze aan.</p>
+  </div>
+  </section>
+
+  
+
+
+  <section class="card" aria-labelledby="logTitle">
       <div class="card-head">
         <h2 id="logTitle">Logboek</h2>
         <span class="hint" id="logCount"></span>
       </div>
       <ul class="log" id="log"></ul>
+      <button class="btn ghost" type="button" id="logMore" hidden></button>
+    </section>
+
+  <p class="foot" id="foot"></p>
+  </div>
+
+  <div class="panel" id="panel-reis" role="tabpanel" aria-labelledby="tab-reis" hidden>
+    <section class="card" aria-labelledby="tripTitle">
+      <div class="card-head"><h2 id="tripTitle">Wat kost de reis?</h2></div>
+      <div class="trip-grid">
+        <div class="trip-form trip-route">
+          <div class="field">
+            <label for="t-van">Van <span class="opt">(plaats of adres)</span></label>
+            <input type="text" class="text" id="t-van" placeholder="Arnhem" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="t-naar">Naar</label>
+            <input type="text" class="text" id="t-naar" placeholder="Amsterdam" autocomplete="off">
+          </div>
+          <button class="btn ghost" type="button" id="t-zoek">Afstand opzoeken</button>
+          <p class="hint" id="t-info" role="status">Of vul hieronder zelf de kilometers in. Bij opzoeken gaan Van en Naar naar OpenStreetMap en OSRM, twee gratis routediensten.</p>
+          <div class="field">
+            <label for="t-km">Kilometers, enkele reis</label>
+            <div class="input-unit"><input type="text" inputmode="decimal" id="t-km" placeholder="99" autocomplete="off"><span>km</span></div>
+          </div>
+        </div>
+        <div class="trip-result" id="t-result" aria-live="polite"></div>
+        <div class="trip-calc">
+          <div class="field">
+            <label for="t-verbruik">Verbruik</label>
+            <div class="chips" id="t-v-chips" role="group" aria-label="Snelkeuze verbruik"></div>
+            <div class="input-unit"><input type="text" inputmode="decimal" id="t-verbruik" placeholder="6,5" autocomplete="off"><span>L/100 km</span></div>
+          </div>
+          <div class="field">
+            <label for="t-prijs">Literprijs</label>
+            <div class="chips" id="t-p-chips" role="group" aria-label="Snelkeuze literprijs"></div>
+            <div class="input-unit"><input type="text" inputmode="decimal" id="t-prijs" placeholder="2,000" autocomplete="off"><span>€/L</span></div>
+          </div>
+        </div>
+      </div>
     </section>
   </div>
 
@@ -447,8 +577,10 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     </div>
   </details>
 
-  <p class="foot" id="foot"></p>
+  
 </div>
+
+<div class="toast" id="toast" role="status" hidden></div>
 
 <script>
 (function () {
@@ -733,6 +865,9 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     renderOil(real);
     renderChange(real);
     renderFluids(real);
+    renderStationChips();
+    updatePrijsHint();
+    renderTrip();
 
     renderKpis(s, rows, state.mode === "loading");
     renderLog(s, sample);
@@ -764,7 +899,7 @@ input[aria-invalid="true"] { border-color: var(--bad); }
 
     const costTile =
       '<div class="kpi"><span class="label">Kosten</span>' +
-      '<span class="big num">' + (s.kosten100 != null ? eur.format(s.kosten100).replace(/\s/g, " ") : "–") + "<small>per 100 km</small></span>" +
+      '<span class="big num">' + (s.kosten100 != null ? eur.format(s.kosten100).replace(/\s/g, " ") : "–") + "<small>/100 km</small></span>" +
       '<span class="meta">' + (s.avgPrijs != null ? "Gem. literprijs € " + f3.format(s.avgPrijs) + " · totaal " + eur.format(s.cost) : "Vul een literprijs in om kosten te zien") + "</span></div>";
 
     el("kpis").innerHTML = lead + lastTile + l5Tile + costTile;
@@ -772,10 +907,12 @@ input[aria-invalid="true"] { border-color: var(--bad); }
 
   function renderLog(s, sample) {
     const ul = el("log");
+    el("logMore").hidden = true;
     el("logCount").textContent = s.points.length ? s.points.length + (s.points.length === 1 ? " tankbeurt" : " tankbeurten") : "";
     if (state.mode === "loading") { ul.innerHTML = '<li class="empty-log">Tankbeurten laden…</li>'; return; }
     if (!s.points.length) { ul.innerHTML = '<li class="empty-log">Nog niets ingevuld.</li>'; return; }
-    const html = s.points.slice().reverse().map((p) => {
+    const all = s.points.slice().reverse();
+    const html = (state.logAll ? all : all.slice(0, 5)).map((p) => {
       const e = p.e;
       const d = p.verbruik - s.avg;
       const cls = Math.abs(d) < 0.05 ? "flat" : d < 0 ? "good" : "bad";
@@ -798,6 +935,9 @@ input[aria-invalid="true"] { border-color: var(--bad); }
         '<span class="acts">' + acts + "</span></li>";
     }).join("");
     ul.innerHTML = html;
+    const more = el("logMore");
+    more.hidden = all.length <= 5;
+    more.textContent = state.logAll ? "Toon minder" : "Toon alle " + all.length + " tankbeurten";
   }
 
   /* ---------- Oliecheck ---------- */
@@ -823,6 +963,8 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     el("oilFill").dataset.state = due ? "bad" : soon ? "warn" : "good";
     el("oilBar").setAttribute("aria-valuenow", String(Math.round(pct)));
     el("oilCard").classList.toggle("due", due);
+    setFold("oil", due || soon);
+    el("oilSum").textContent = due ? "" : "nog " + f0.format(o.left) + " km";
     el("oilMain").innerHTML = due
       ? (-o.left < 1 ? "Het is tijd voor een oliecheck." : "Je bent <b class=\"num\">" + f0.format(-o.left) + " km</b> over je oliecheck heen.") + " Controleer het oliepeil bij je volgende stop."
       : "Nog <b class=\"num\">" + f0.format(o.left) + " km</b> tot je volgende oliecheck.";
@@ -875,6 +1017,8 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     el("chgFill").dataset.state = due ? "bad" : soon ? "warn" : "good";
     el("chgBar").setAttribute("aria-valuenow", String(Math.round(pct)));
     el("chgCard").classList.toggle("due", due);
+    setFold("chg", due || soon);
+    el("chgSum").textContent = due ? "" : c.kmLeft > 0 ? "nog " + f0.format(c.kmLeft) + " km" : "";
     const when = c.daysLeft == null ? "" : c.daysLeft >= 60 ? Math.round(c.daysLeft / 30.4) + " maanden" : c.daysLeft + (c.daysLeft === 1 ? " dag" : " dagen");
     let main;
     if (due) {
@@ -937,12 +1081,14 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     }).join("");
   }
   function renderFluids(real) {
+    let dueN = 0, soonN = 0;
     VLOEISTOFFEN.forEach((f) => {
       const id = (s) => "fl-" + f.key + "-" + s;
       const c = fluidCfg(f), t = trackInfo(real, "vloeistof-" + f.key, c.km, c.mnd);
       const kmDue = t.kmLeft != null && t.kmLeft <= 0, dateDue = t.daysLeft != null && t.daysLeft <= 0;
       const due = kmDue || dateDue;
       const soon = !due && ((t.kmLeft != null && t.kmLeft <= c.km * 0.1) || (t.daysLeft != null && t.daysLeft <= 30));
+      if (due) dueN++; else if (soon) soonN++;
       const kmPct = t.kmLeft != null ? (t.since / c.km) * 100 : 0;
       const timePct = t.daysLeft != null && t.totalDays > 0 ? ((t.totalDays - t.daysLeft) / t.totalDays) * 100 : 0;
       const pct = Math.max(0, Math.min(100, Math.max(kmPct, timePct)));
@@ -972,6 +1118,169 @@ input[aria-invalid="true"] { border-color: var(--bad); }
       if (document.activeElement !== el(id("km"))) el(id("km")).value = String(c.km);
       if (document.activeElement !== el(id("mnd"))) el(id("mnd")).value = String(c.mnd);
     });
+    const fchip = el("flChip");
+    fchip.className = "chip " + (dueN ? "bad" : soonN ? "warn" : "good");
+    fchip.textContent = dueN ? dueN + " nu doen" : soonN ? "Binnenkort" : "Alles op tijd";
+    setFold("fl", dueN + soonN > 0);
+  }
+
+  /* ---------- Tankstation: snelkeuze en vorige prijs ---------- */
+  const FAVORIET_STATION = "Makro Duiven";
+  function stationOpties() {
+    const count = new Map();
+    sorted(state.items).forEach((e) => { if (e.station) count.set(e.station, (count.get(e.station) || 0) + 1); });
+    const others = Array.from(count.entries())
+      .filter((x) => x[0].toLowerCase() !== FAVORIET_STATION.toLowerCase())
+      .sort((a, b) => b[1] - a[1]).slice(0, 3).map((x) => x[0]);
+    return [FAVORIET_STATION].concat(others);
+  }
+  function renderStationChips() {
+    const box = el("stationChips");
+    const opts = stationOpties(), key = opts.join("|");
+    if (box.dataset.key !== key) {
+      box.textContent = "";
+      opts.forEach((name) => {
+        const b = document.createElement("button");
+        b.type = "button"; b.dataset.station = name; b.textContent = name;
+        box.appendChild(b);
+      });
+      box.dataset.key = key;
+    }
+    const cur = fStation.value.trim().toLowerCase();
+    box.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.station.toLowerCase() === cur)));
+  }
+  function updatePrijsHint() {
+    const btn = el("prijsFill");
+    const st = fStation.value.trim().toLowerCase();
+    let last = null;
+    if (st) {
+      sorted(state.items).forEach((e) => { if (e.prijs > 0 && e.station && e.station.toLowerCase() === st) last = e; });
+    }
+    const typed = parseNum(fPrijs.value);
+    if (!last || (typed != null && Math.abs(typed - last.prijs) < 0.0005)) { btn.hidden = true; return; }
+    btn.dataset.prijs = String(last.prijs);
+    btn.textContent = "Vorige keer € " + f3.format(last.prijs) + " per liter. Invullen";
+    btn.hidden = false;
+  }
+
+  /* ---------- Inklappen, logboek, melding ---------- */
+  state.fold = { oil: null, chg: null, fl: null };
+  state.logAll = false;
+  function setFold(key, attention) {
+    const open = state.fold[key] != null ? state.fold[key] : attention;
+    el(key + "Fold").hidden = !open;
+    el(key + "Head").setAttribute("aria-expanded", String(open));
+  }
+  let toastTimer;
+  function showToast(msg) {
+    const t = el("toast");
+    t.textContent = msg; t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.hidden = true; }, 3500);
+  }
+
+  /* ---------- Reiskosten ---------- */
+  state.trip = { vMode: "gem", pMode: "laatste", duur: null };
+  function renderChips(boxId, opts, active) {
+    const box = el(boxId);
+    box.textContent = "";
+    opts.forEach((o) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.dataset.mode = o.mode; b.textContent = o.label + " " + o.text;
+      b.setAttribute("aria-pressed", String(o.mode === active));
+      box.appendChild(b);
+    });
+  }
+  function renderTrip() {
+    const rows = sorted(state.items), s = stats(rows), T = state.trip;
+    const lastP = rows.slice().reverse().find((e) => e.prijs > 0);
+    const defV = { gem: rows.length ? s.avg : null, l5: rows.length ? s.avg5 : null };
+    const defP = { laatste: lastP ? lastP.prijs : null, gem: s.avgPrijs };
+    renderChips("t-v-chips", [
+      { mode: "gem", label: "Gemiddeld", v: defV.gem, text: defV.gem != null ? f1.format(defV.gem) : "" },
+      { mode: "l5", label: "Laatste 5", v: defV.l5, text: defV.l5 != null ? f1.format(defV.l5) : "" }
+    ].filter((o) => o.v != null), T.vMode);
+    renderChips("t-p-chips", [
+      { mode: "laatste", label: "Laatste", v: defP.laatste, text: defP.laatste != null ? "€ " + f3.format(defP.laatste) : "" },
+      { mode: "gem", label: "Gemiddeld", v: defP.gem, text: defP.gem != null ? "€ " + f3.format(defP.gem) : "" }
+    ].filter((o) => o.v != null), T.pMode);
+    if (T.vMode !== "zelf" && defV[T.vMode] != null && document.activeElement !== el("t-verbruik")) el("t-verbruik").value = f2.format(defV[T.vMode]);
+    if (T.pMode !== "zelf" && defP[T.pMode] != null && document.activeElement !== el("t-prijs")) el("t-prijs").value = f3.format(defP[T.pMode]);
+    updateTrip();
+  }
+  function updateTrip() {
+    const km = parseNum(el("t-km").value), v = parseNum(el("t-verbruik").value), p = parseNum(el("t-prijs").value);
+    const box = el("t-result");
+    const missing = [];
+    if (!(km > 0)) missing.push("de kilometers (of een route)");
+    if (!(v > 0)) missing.push("je verbruik");
+    if (!(p > 0)) missing.push("de literprijs");
+    if (missing.length) {
+      box.innerHTML = '<p class="empty-chart">Vul ' + missing.join(", ").replace(/, ([^,]*)$/, " en $1") + " in om de kosten te zien.</p>";
+      return;
+    }
+    if (km > 20000 || v > 60 || p > 10) { box.innerHTML = '<p class="empty-chart">Controleer de ingevulde getallen.</p>'; return; }
+    const liters = (km * v) / 100, euro = liters * p;
+    const kmText = (x) => (Math.abs(x - Math.round(x)) < 0.05 ? f0 : f1).format(x);
+    const tile = (label, mult, lead) =>
+      '<div class="kpi' + (lead ? " lead" : "") + '"><span class="label">' + label + "</span>" +
+      '<span class="big num">' + eur.format(euro * mult).replace(/\s/g, " ") + "</span>" +
+      '<span class="meta num">' + kmText(km * mult) + " km · " + f1.format(liters * mult) + " L</span></div>";
+    box.innerHTML = '<div class="kpis">' + tile("Enkele reis", 1, false) + tile("Retour", 2, true) + "</div>" +
+      '<p class="trip-sum"><span class="num">' + f1.format(km) + " km × " + f2.format(v) + " L/100 km = " + f1.format(liters) +
+      " L × € " + f3.format(p) + "</span> per liter. Op de snelweg verbruik je vaak meer dan je gemiddelde.</p>";
+  }
+  function fmtDuur(sec) {
+    const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60);
+    return h ? h + " u " + (m ? m + " min" : "") : m + " min";
+  }
+  async function geocode(q) {
+    const res = await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=nl&q=" + encodeURIComponent(q));
+    if (!res.ok) throw { status: res.status };
+    const j = await res.json();
+    if (!j.length) throw { notFound: q };
+    return { lat: j[0].lat, lon: j[0].lon, naam: String(j[0].display_name || q).split(",").slice(0, 2).join(",").trim() };
+  }
+  async function zoekRoute() {
+    const van = el("t-van").value.trim(), naar = el("t-naar").value.trim();
+    const info = el("t-info"), btn = el("t-zoek");
+    if (!van || !naar) { info.textContent = "Vul bij Van en Naar een plaats of adres in, of vul zelf de kilometers in."; return; }
+    btn.disabled = true;
+    info.textContent = "Route opzoeken…";
+    try {
+      const a = await geocode(van);
+      const b = await geocode(naar);
+      const res = await fetch("https://router.project-osrm.org/route/v1/driving/" + a.lon + "," + a.lat + ";" + b.lon + "," + b.lat + "?overview=false");
+      if (!res.ok) throw { status: res.status };
+      const j = await res.json();
+      if (j.code !== "Ok" || !j.routes || !j.routes.length) throw { geenRoute: true };
+      const km = j.routes[0].distance / 1000;
+      el("t-km").value = f1.format(km);
+      state.trip.duur = j.routes[0].duration;
+      info.textContent = a.naam + " naar " + b.naam + ": " + f1.format(km) + " km, ongeveer " + fmtDuur(j.routes[0].duration) + " rijden. Je kunt de kilometers hieronder nog aanpassen.";
+      updateTrip();
+    } catch (e) {
+      info.textContent = e && e.notFound ? "Ik kan \"" + e.notFound + "\" niet vinden. Probeer een plaats of adres, of vul zelf de kilometers in."
+        : e && e.geenRoute ? "Er is geen autoroute gevonden tussen deze plaatsen. Vul zelf de kilometers in."
+        : e && e.status === 429 ? "De routedienst is even druk. Probeer het zo nog eens of vul zelf de kilometers in."
+        : "Opzoeken lukt nu niet. Vul zelf de kilometers in.";
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  /* ---------- Tabbladen ---------- */
+  const TABS = ["tank", "reis"];
+  function showTab(name, focus) {
+    TABS.forEach((t) => {
+      const on = t === name;
+      el("tab-" + t).setAttribute("aria-selected", String(on));
+      el("tab-" + t).tabIndex = on ? 0 : -1;
+      el("panel-" + t).hidden = !on;
+    });
+    try { localStorage.setItem("tankboek.tab", name); } catch (e) { /* niets te doen */ }
+    if (name === "reis") renderTrip();
+    if (focus) el("tab-" + name).focus();
   }
 
   /* ---------- Grafiek ---------- */
@@ -1126,11 +1435,25 @@ input[aria-invalid="true"] { border-color: var(--bad); }
       pv.textContent = "Vul liters en kilometers in om je verbruik te zien.";
     }
   }
-  [fLiters, fKm, fPrijs].forEach((i) => i.addEventListener("input", () => { i.removeAttribute("aria-invalid"); updatePreview(); }));
+  [fLiters, fKm, fPrijs].forEach((i) => i.addEventListener("input", () => { i.removeAttribute("aria-invalid"); updatePreview(); updatePrijsHint(); }));
+  fStation.addEventListener("input", () => { renderStationChips(); updatePrijsHint(); });
+  el("stationChips").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button[data-station]");
+    if (!b) return;
+    const same = fStation.value.trim().toLowerCase() === b.dataset.station.toLowerCase();
+    fStation.value = same ? "" : b.dataset.station;
+    renderStationChips(); updatePrijsHint();
+  });
+  el("prijsFill").addEventListener("click", () => {
+    fPrijs.value = f3.format(Number(el("prijsFill").dataset.prijs));
+    fPrijs.removeAttribute("aria-invalid");
+    updatePreview(); updatePrijsHint();
+  });
 
   function resetForm() {
     state.editing = null;
     fLiters.value = ""; fKm.value = ""; fPrijs.value = ""; fStation.value = "";
+    renderStationChips(); updatePrijsHint();
     fDatum.value = todayIso();
     el("formTitle").textContent = "Nieuwe tankbeurt";
     el("saveBtn").textContent = "Tankbeurt opslaan";
@@ -1173,6 +1496,7 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     try {
       await saveEntry(entry);
       resetForm();
+      showToast(old ? "Wijziging opgeslagen." : "Tankbeurt opgeslagen: " + f1.format(lp100(entry)) + " L/100 km");
     } catch (e) {
       if (e && e.code === "invalid_argument") { err.textContent = "Je kunt in dit tankboek alleen kijken, niet opslaan."; state.readOnly = true; render(); }
       else if (e && e.code === "quota_exceeded") err.textContent = "Het tankboek is vol. Verwijder oude tankbeurten om ruimte te maken.";
@@ -1198,6 +1522,7 @@ input[aria-invalid="true"] { border-color: var(--bad); }
       fKm.value = String(e.km).replace(".", ",");
       fPrijs.value = e.prijs > 0 ? f3.format(e.prijs) : "";
       fStation.value = e.station || "";
+      renderStationChips(); updatePrijsHint();
       el("formTitle").textContent = "Tankbeurt wijzigen";
       el("saveBtn").textContent = "Wijziging opslaan";
       el("cancelBtn").hidden = false;
@@ -1230,7 +1555,7 @@ input[aria-invalid="true"] { border-color: var(--bad); }
   async function oilSave(entry, errId) {
     const err = el(errId || "oilErr");
     if (state.mode === "loading") { err.textContent = "Even geduld, je tankboek wordt nog geladen."; return false; }
-    try { await saveEntry(entry); err.textContent = ""; return true; }
+    try { await saveEntry(entry); err.textContent = ""; showToast("Opgeslagen."); return true; }
     catch (e) {
       err.textContent = e && e.code === "invalid_argument" ? "Je kunt in dit tankboek alleen kijken, niet opslaan."
         : e && e.code === "local_failed" ? "Deze browser staat opslaan niet toe (privévenster?). Je oliecheck is niet bewaard."
@@ -1334,6 +1659,41 @@ input[aria-invalid="true"] { border-color: var(--bad); }
       });
     });
   });
+
+  TABS.forEach((t) => {
+    el("tab-" + t).addEventListener("click", () => showTab(t, false));
+    el("tab-" + t).addEventListener("keydown", (ev) => {
+      if (ev.key !== "ArrowRight" && ev.key !== "ArrowLeft") return;
+      ev.preventDefault();
+      showTab(TABS[(TABS.indexOf(t) + (ev.key === "ArrowRight" ? 1 : TABS.length - 1)) % TABS.length], true);
+    });
+  });
+  ["oil", "chg", "fl"].forEach((key) => {
+    const head = el(key + "Head"), body = el(key + "Fold");
+    const toggle = () => { state.fold[key] = body.hidden; setFold(key, false); };
+    head.addEventListener("click", toggle);
+    head.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); toggle(); } });
+    ["pointerdown", "focusin"].forEach((evt) => body.addEventListener(evt, () => { if (state.fold[key] == null) state.fold[key] = true; }));
+  });
+  el("logMore").addEventListener("click", () => { state.logAll = !state.logAll; render(); });
+  el("t-zoek").addEventListener("click", zoekRoute);
+  ["t-van", "t-naar"].forEach((id) => el(id).addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); zoekRoute(); } }));
+  el("t-km").addEventListener("input", () => { state.trip.duur = null; updateTrip(); });
+  el("t-verbruik").addEventListener("input", () => { state.trip.vMode = "zelf"; renderTrip(); });
+  el("t-prijs").addEventListener("input", () => { state.trip.pMode = "zelf"; renderTrip(); });
+  el("t-v-chips").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button[data-mode]");
+    if (b) { state.trip.vMode = b.dataset.mode; renderTrip(); }
+  });
+  el("t-p-chips").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button[data-mode]");
+    if (b) { state.trip.pMode = b.dataset.mode; renderTrip(); }
+  });
+  let startTab = "tank";
+  try { startTab = localStorage.getItem("tankboek.tab") || "tank"; } catch (e) { /* niets te doen */ }
+  if (location.hash === "#reiskosten") startTab = "reis";
+  if (TABS.indexOf(startTab) < 0) startTab = "tank";
+  showTab(startTab, false);
 
   el("gSave").addEventListener("click", () => {
     const g = state.gh;
