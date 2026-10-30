@@ -4,6 +4,7 @@
 
 Open `index.html` in je browser. Je ziet dan:
 
+- bovenaan het formulier voor een nieuwe tankbeurt, met snelkeuzeknoppen voor je tankstation (Makro Duiven staat er altijd, daarna je meest gebruikte stations) en de literprijs van de vorige keer bij dat station
 - verbruik per tankbeurt in L/100 km en "1 op X"
 - gemiddeld verbruik, laatste tankbeurt en het gemiddelde van de laatste 5
 - een grafiek met het lopend gemiddelde (je "equity curve") voor verbruik, literprijs of kosten per 100 km

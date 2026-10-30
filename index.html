@@ -80,6 +80,16 @@ h1 {
 h1 span { color: var(--accent); }
 .sub { color: var(--muted); margin: 4px 0 0; }
 .sub .car { color: var(--ink); font-weight: 600; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips button {
+  font: inherit; font-size: 0.9rem; font-weight: 500; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  padding: 6px 14px; border-radius: 999px;
+}
+.chips button:hover { border-color: var(--accent); }
+.chips button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.chips button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.prijsfill { justify-self: start; text-align: left; padding-left: 0; }
 input.text { font-family: var(--font-body); padding-right: 12px; }
 .status {
   font-size: 0.8rem; color: var(--muted);
@@ -296,6 +306,65 @@ input[aria-invalid="true"] { border-color: var(--bad); }
 
   <section class="kpis" id="kpis" aria-label="Kerncijfers"></section>
 
+  <div class="cols">
+    <section class="card" aria-labelledby="formTitle">
+      <div class="card-head"><h2 id="formTitle">Nieuwe tankbeurt</h2></div>
+      <form id="form" novalidate>
+        <div class="field">
+          <label for="f-datum">Datum</label>
+          <input type="date" id="f-datum" required>
+        </div>
+        <div class="two">
+          <div class="field">
+            <label for="f-liters">Getankt</label>
+            <div class="input-unit"><input type="text" inputmode="decimal" id="f-liters" placeholder="42,5" autocomplete="off"><span>L</span></div>
+          </div>
+          <div class="field">
+            <label for="f-km">Gereden</label>
+            <div class="input-unit"><input type="text" inputmode="decimal" id="f-km" placeholder="650" autocomplete="off"><span>km</span></div>
+          </div>
+        </div>
+        <div class="field">
+          <label for="f-prijs">Literprijs <span class="opt">(optioneel)</span></label>
+          <div class="input-unit"><input type="text" inputmode="decimal" id="f-prijs" placeholder="1,989" autocomplete="off"><span>€/L</span></div>
+          <button type="button" class="link prijsfill" id="prijsFill" hidden></button>
+        </div>
+        <div class="field">
+          <label for="f-station">Tankstation <span class="opt">(optioneel)</span></label>
+          <div class="chips" id="stationChips" role="group" aria-label="Snelkeuze tankstation"></div>
+          <input type="text" class="text" id="f-station" placeholder="Of typ een ander station" maxlength="60" autocomplete="off">
+        </div>
+        <div class="preview" id="preview" aria-live="polite">Vul liters en kilometers in om je verbruik te zien.</div>
+        <p class="err" id="err" role="alert"></p>
+        <div class="btns">
+          <button class="btn primary" type="submit" id="saveBtn">Tankbeurt opslaan</button>
+          <button class="btn ghost" type="button" id="cancelBtn" hidden>Annuleren</button>
+        </div>
+        <p class="hint">Gereden km = de kilometers sinds de vorige tankbeurt (je dagteller). Tank telkens vol, dan klopt het verbruik per beurt het best.</p>
+      </form>
+    </section>
+
+    <section class="card" aria-labelledby="chartTitle">
+    <div class="card-head">
+      <h2 id="chartTitle">Verloop</h2>
+      <div class="seg" role="group" aria-label="Wat wil je zien">
+        <button type="button" id="m-verbruik" data-metric="verbruik" aria-pressed="true">Verbruik</button>
+        <button type="button" id="m-prijs" data-metric="prijs" aria-pressed="false">Literprijs</button>
+        <button type="button" id="m-kosten" data-metric="kosten" aria-pressed="false">Kosten / 100 km</button>
+      </div>
+    </div>
+    <div class="chart-wrap" id="chartWrap">
+      <svg id="chart" role="img" aria-label="Grafiek van het verbruik per tankbeurt en het lopend gemiddelde"></svg>
+      <div class="tip" id="tip" hidden></div>
+    </div>
+    <div class="legend" id="legend">
+      <span><i class="l-run"></i>Lopend gemiddelde</span>
+      <span><i class="l-dot"></i>Per tankbeurt</span>
+      <span><i class="l-avg"></i>Gemiddelde laatste 5</span>
+    </div>
+  </section>
+  </div>
+
   <section class="card oil" id="oilCard" aria-labelledby="oilTitle">
     <div class="card-head">
       <h2 id="oilTitle">Oliecheck</h2>
@@ -354,70 +423,16 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     <p class="hint">Je krijgt een melding bij wat het eerst komt, de kilometers of de maanden. Zet een veld op 0 om kilometers of maanden uit te zetten. De getallen zijn gangbare voorbeelden. Controleer het onderhoudsboekje van je Mazda en pas ze aan.</p>
   </section>
 
-  <section class="card" aria-labelledby="chartTitle">
-    <div class="card-head">
-      <h2 id="chartTitle">Verloop</h2>
-      <div class="seg" role="group" aria-label="Wat wil je zien">
-        <button type="button" id="m-verbruik" data-metric="verbruik" aria-pressed="true">Verbruik</button>
-        <button type="button" id="m-prijs" data-metric="prijs" aria-pressed="false">Literprijs</button>
-        <button type="button" id="m-kosten" data-metric="kosten" aria-pressed="false">Kosten / 100 km</button>
-      </div>
-    </div>
-    <div class="chart-wrap" id="chartWrap">
-      <svg id="chart" role="img" aria-label="Grafiek van het verbruik per tankbeurt en het lopend gemiddelde"></svg>
-      <div class="tip" id="tip" hidden></div>
-    </div>
-    <div class="legend" id="legend">
-      <span><i class="l-run"></i>Lopend gemiddelde</span>
-      <span><i class="l-dot"></i>Per tankbeurt</span>
-      <span><i class="l-avg"></i>Gemiddelde laatste 5</span>
-    </div>
-  </section>
+  
 
-  <div class="cols">
-    <section class="card" aria-labelledby="formTitle">
-      <div class="card-head"><h2 id="formTitle">Nieuwe tankbeurt</h2></div>
-      <form id="form" novalidate>
-        <div class="field">
-          <label for="f-datum">Datum</label>
-          <input type="date" id="f-datum" required>
-        </div>
-        <div class="two">
-          <div class="field">
-            <label for="f-liters">Getankt</label>
-            <div class="input-unit"><input type="text" inputmode="decimal" id="f-liters" placeholder="42,5" autocomplete="off"><span>L</span></div>
-          </div>
-          <div class="field">
-            <label for="f-km">Gereden</label>
-            <div class="input-unit"><input type="text" inputmode="decimal" id="f-km" placeholder="650" autocomplete="off"><span>km</span></div>
-          </div>
-        </div>
-        <div class="field">
-          <label for="f-prijs">Literprijs <span class="opt">(optioneel)</span></label>
-          <div class="input-unit"><input type="text" inputmode="decimal" id="f-prijs" placeholder="1,989" autocomplete="off"><span>€/L</span></div>
-        </div>
-        <div class="field">
-          <label for="f-station">Tankstation <span class="opt">(optioneel)</span></label>
-          <input type="text" class="text" id="f-station" placeholder="Makro Duiven" maxlength="60" autocomplete="off">
-        </div>
-        <div class="preview" id="preview" aria-live="polite">Vul liters en kilometers in om je verbruik te zien.</div>
-        <p class="err" id="err" role="alert"></p>
-        <div class="btns">
-          <button class="btn primary" type="submit" id="saveBtn">Tankbeurt opslaan</button>
-          <button class="btn ghost" type="button" id="cancelBtn" hidden>Annuleren</button>
-        </div>
-        <p class="hint">Gereden km = de kilometers sinds de vorige tankbeurt (je dagteller). Tank telkens vol, dan klopt het verbruik per beurt het best.</p>
-      </form>
-    </section>
 
-    <section class="card" aria-labelledby="logTitle">
+  <section class="card" aria-labelledby="logTitle">
       <div class="card-head">
         <h2 id="logTitle">Logboek</h2>
         <span class="hint" id="logCount"></span>
       </div>
       <ul class="log" id="log"></ul>
     </section>
-  </div>
 
   <details class="card sync" id="syncCard" hidden>
     <summary><h2>Synchroniseren met GitHub</h2><span class="syncstate" id="syncState">Niet gekoppeld</span></summary>
@@ -733,6 +748,8 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     renderOil(real);
     renderChange(real);
     renderFluids(real);
+    renderStationChips();
+    updatePrijsHint();
 
     renderKpis(s, rows, state.mode === "loading");
     renderLog(s, sample);
@@ -974,6 +991,45 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     });
   }
 
+  /* ---------- Tankstation: snelkeuze en vorige prijs ---------- */
+  const FAVORIET_STATION = "Makro Duiven";
+  function stationOpties() {
+    const count = new Map();
+    sorted(state.items).forEach((e) => { if (e.station) count.set(e.station, (count.get(e.station) || 0) + 1); });
+    const others = Array.from(count.entries())
+      .filter((x) => x[0].toLowerCase() !== FAVORIET_STATION.toLowerCase())
+      .sort((a, b) => b[1] - a[1]).slice(0, 3).map((x) => x[0]);
+    return [FAVORIET_STATION].concat(others);
+  }
+  function renderStationChips() {
+    const box = el("stationChips");
+    const opts = stationOpties(), key = opts.join("|");
+    if (box.dataset.key !== key) {
+      box.textContent = "";
+      opts.forEach((name) => {
+        const b = document.createElement("button");
+        b.type = "button"; b.dataset.station = name; b.textContent = name;
+        box.appendChild(b);
+      });
+      box.dataset.key = key;
+    }
+    const cur = fStation.value.trim().toLowerCase();
+    box.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.station.toLowerCase() === cur)));
+  }
+  function updatePrijsHint() {
+    const btn = el("prijsFill");
+    const st = fStation.value.trim().toLowerCase();
+    let last = null;
+    if (st) {
+      sorted(state.items).forEach((e) => { if (e.prijs > 0 && e.station && e.station.toLowerCase() === st) last = e; });
+    }
+    const typed = parseNum(fPrijs.value);
+    if (!last || (typed != null && Math.abs(typed - last.prijs) < 0.0005)) { btn.hidden = true; return; }
+    btn.dataset.prijs = String(last.prijs);
+    btn.textContent = "Vorige keer € " + f3.format(last.prijs) + " per liter. Invullen";
+    btn.hidden = false;
+  }
+
   /* ---------- Grafiek ---------- */
   const METRICS = {
     verbruik: { val: "verbruik", run: "runVerbruik", fmt: (v) => f1.format(v), unit: "L/100 km", digits: 1, title: "Verbruik per tankbeurt" },
@@ -1126,11 +1182,25 @@ input[aria-invalid="true"] { border-color: var(--bad); }
       pv.textContent = "Vul liters en kilometers in om je verbruik te zien.";
     }
   }
-  [fLiters, fKm, fPrijs].forEach((i) => i.addEventListener("input", () => { i.removeAttribute("aria-invalid"); updatePreview(); }));
+  [fLiters, fKm, fPrijs].forEach((i) => i.addEventListener("input", () => { i.removeAttribute("aria-invalid"); updatePreview(); updatePrijsHint(); }));
+  fStation.addEventListener("input", () => { renderStationChips(); updatePrijsHint(); });
+  el("stationChips").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button[data-station]");
+    if (!b) return;
+    const same = fStation.value.trim().toLowerCase() === b.dataset.station.toLowerCase();
+    fStation.value = same ? "" : b.dataset.station;
+    renderStationChips(); updatePrijsHint();
+  });
+  el("prijsFill").addEventListener("click", () => {
+    fPrijs.value = f3.format(Number(el("prijsFill").dataset.prijs));
+    fPrijs.removeAttribute("aria-invalid");
+    updatePreview(); updatePrijsHint();
+  });
 
   function resetForm() {
     state.editing = null;
     fLiters.value = ""; fKm.value = ""; fPrijs.value = ""; fStation.value = "";
+    renderStationChips(); updatePrijsHint();
     fDatum.value = todayIso();
     el("formTitle").textContent = "Nieuwe tankbeurt";
     el("saveBtn").textContent = "Tankbeurt opslaan";
@@ -1198,6 +1268,7 @@ input[aria-invalid="true"] { border-color: var(--bad); }
       fKm.value = String(e.km).replace(".", ",");
       fPrijs.value = e.prijs > 0 ? f3.format(e.prijs) : "";
       fStation.value = e.station || "";
+      renderStationChips(); updatePrijsHint();
       el("formTitle").textContent = "Tankbeurt wijzigen";
       el("saveBtn").textContent = "Wijziging opslaan";
       el("cancelBtn").hidden = false;
