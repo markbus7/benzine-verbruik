@@ -329,6 +329,15 @@ input[aria-invalid="true"] { border-color: var(--bad); }
 }
 
 /* Telefoon en aanraking */
+/* Safari (iPhone/iPad) geeft datumvelden een eigen minimale breedte en centreert de tekst */
+.field { min-width: 0; }
+input[type="date"] {
+  -webkit-appearance: none; appearance: none;
+  display: block; width: 100%; max-width: 100%; min-width: 0; min-height: 48px;
+  text-align: left;
+}
+input[type="date"]::-webkit-date-and-time-value { text-align: left; margin: 0; }
+input[type="date"]::-webkit-calendar-picker-indicator { margin-left: auto; }
 input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
 .btn { min-height: 46px; padding: 12px 18px; }
 .chips button { min-height: 40px; padding: 8px 16px; }
@@ -370,7 +379,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     <div>
       <h1>Tank<span>boek</span></h1>
       <p class="sub"><strong class="car">Mazda 2 Touring · 2007</strong> · Vul na elke tankbeurt in hoeveel je getankt en gereden hebt.</p>
-      <p class="ver" id="versie">Versie 1.7 · 30 okt 2026</p>
+      <p class="ver" id="versie">Versie 1.8 · 30 okt 2026</p>
     </div>
     <span class="status" id="status" data-state="">Laden…</span>
   </header>
