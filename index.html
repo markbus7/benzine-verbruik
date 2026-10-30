@@ -315,6 +315,42 @@ input[aria-invalid="true"] { border-color: var(--bad); }
 @media (prefers-reduced-motion: no-preference) {
   .kpi .big, .log li { transition: color 0.2s; }
 }
+
+/* Telefoon en aanraking */
+input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
+.btn { min-height: 46px; padding: 12px 18px; }
+.chips button { min-height: 40px; padding: 8px 16px; }
+.seg button { min-height: 38px; padding: 8px 14px; }
+.link { min-height: 36px; padding: 8px 10px; }
+.tabs button { min-height: 44px; }
+#logMore { justify-self: stretch; width: 100%; margin-top: 8px; }
+.fold-head { cursor: pointer; user-select: none; gap: 6px 10px; min-height: 44px; align-items: center; }
+.fold-head h2::after { content: "▸"; color: var(--muted); font-size: 0.9rem; margin-left: 8px; }
+.fold-head[aria-expanded="true"] h2::after { content: "▾"; }
+.fold-head:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 6px; }
+.fold-sum { color: var(--muted); font-size: 0.9rem; margin-left: auto; }
+.fold { display: grid; gap: 10px; margin-top: 2px; }
+.log li { padding: 14px 0; }
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%); z-index: 30;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  background: var(--ink); color: var(--bg); padding: 12px 18px; border-radius: 10px;
+  font-size: 0.95rem; max-width: calc(100% - 32px); box-shadow: 0 4px 16px rgb(0 0 0 / 0.25);
+}
+@media (max-width: 640px) {
+  .wrap { padding-block: 16px calc(92px + env(safe-area-inset-bottom, 0px)); gap: 16px; }
+  .toast { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+  .tabs {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+    background: var(--surface); border-top: 1px solid var(--line); border-bottom: 0;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .tabs button { font-size: 1.2rem; min-height: 56px; border-bottom: 0; border-top: 3px solid transparent; margin-bottom: 0; }
+  .tabs button[aria-selected="true"] { border-top-color: var(--accent); }
+  .card { padding: 16px; }
+}
 </style>
 
 <div class="wrap">
@@ -398,10 +434,11 @@ input[aria-invalid="true"] { border-color: var(--bad); }
   </div>
 
   <section class="card oil" id="oilCard" aria-labelledby="oilTitle">
-    <div class="card-head">
-      <h2 id="oilTitle">Oliecheck</h2>
+    <div class="card-head fold-head" id="oilHead" role="button" tabindex="0" aria-expanded="false" aria-controls="oilFold">
+      <h2 id="oilTitle">Oliecheck</h2><span class="fold-sum" id="oilSum"></span>
       <span class="chip good" id="oilChip">Op tijd</span>
     </div>
+    <div class="fold" id="oilFold" hidden>
     <div class="bar" id="oilBar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Kilometers sinds de laatste oliecheck"><i id="oilFill" data-state="good"></i></div>
     <p class="oil-main" id="oilMain"></p>
     <p class="oil-sub" id="oilSub"></p>
@@ -419,13 +456,15 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     </div>
     <p class="err" id="oilErr" role="alert"></p>
     <p class="hint">Het Tankboek telt de kilometers van je tankbeurten. Rijd je tussendoor veel, dan loopt de teller pas bij je volgende tankbeurt bij.</p>
+  </div>
   </section>
 
   <section class="card oil" id="chgCard" aria-labelledby="chgTitle">
-    <div class="card-head">
-      <h2 id="chgTitle">Olie verversen</h2>
+    <div class="card-head fold-head" id="chgHead" role="button" tabindex="0" aria-expanded="false" aria-controls="chgFold">
+      <h2 id="chgTitle">Olie verversen</h2><span class="fold-sum" id="chgSum"></span>
       <span class="chip flat" id="chgChip">Nog niet vastgelegd</span>
     </div>
+    <div class="fold" id="chgFold" hidden>
     <div class="bar" id="chgBar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Voortgang tot de volgende olieverversing"><i id="chgFill" data-state="good"></i></div>
     <p class="oil-main" id="chgMain"></p>
     <p class="oil-sub" id="chgSub"></p>
@@ -447,12 +486,15 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     </div>
     <p class="err" id="chgErr" role="alert"></p>
     <p class="hint">Je krijgt een melding bij wat het eerst komt, de kilometers of de maanden. 15.000 km of 12 maanden is een gangbare keuze. Controleer wat het onderhoudsboekje van je Mazda zegt en pas het aan. Vul bij een eerdere verversing de echte datum in, dan loopt de tijd goed mee. Kilometers van voor je eerste tankbeurt in het Tankboek tellen niet mee.</p>
+  </div>
   </section>
 
   <section class="card oil" id="flCard" aria-labelledby="flTitle">
-    <div class="card-head"><h2 id="flTitle">Vloeistoffen</h2></div>
+    <div class="card-head fold-head" id="flHead" role="button" tabindex="0" aria-expanded="false" aria-controls="flFold"><h2 id="flTitle">Vloeistoffen</h2><span class="chip flat" id="flChip">Alles op tijd</span></div>
+    <div class="fold" id="flFold" hidden>
     <div class="fl-list" id="flList"></div>
     <p class="hint">Je krijgt een melding bij wat het eerst komt, de kilometers of de maanden. Zet een veld op 0 om kilometers of maanden uit te zetten. De getallen zijn gangbare voorbeelden. Controleer het onderhoudsboekje van je Mazda en pas ze aan.</p>
+  </div>
   </section>
 
   
@@ -464,6 +506,7 @@ input[aria-invalid="true"] { border-color: var(--bad); }
         <span class="hint" id="logCount"></span>
       </div>
       <ul class="log" id="log"></ul>
+      <button class="btn ghost" type="button" id="logMore" hidden></button>
     </section>
 
   <p class="foot" id="foot"></p>
@@ -536,6 +579,8 @@ input[aria-invalid="true"] { border-color: var(--bad); }
 
   
 </div>
+
+<div class="toast" id="toast" role="status" hidden></div>
 
 <script>
 (function () {
@@ -854,7 +899,7 @@ input[aria-invalid="true"] { border-color: var(--bad); }
 
     const costTile =
       '<div class="kpi"><span class="label">Kosten</span>' +
-      '<span class="big num">' + (s.kosten100 != null ? eur.format(s.kosten100).replace(/\s/g, " ") : "–") + "<small>per 100 km</small></span>" +
+      '<span class="big num">' + (s.kosten100 != null ? eur.format(s.kosten100).replace(/\s/g, " ") : "–") + "<small>/100 km</small></span>" +
       '<span class="meta">' + (s.avgPrijs != null ? "Gem. literprijs € " + f3.format(s.avgPrijs) + " · totaal " + eur.format(s.cost) : "Vul een literprijs in om kosten te zien") + "</span></div>";
 
     el("kpis").innerHTML = lead + lastTile + l5Tile + costTile;
@@ -862,10 +907,12 @@ input[aria-invalid="true"] { border-color: var(--bad); }
 
   function renderLog(s, sample) {
     const ul = el("log");
+    el("logMore").hidden = true;
     el("logCount").textContent = s.points.length ? s.points.length + (s.points.length === 1 ? " tankbeurt" : " tankbeurten") : "";
     if (state.mode === "loading") { ul.innerHTML = '<li class="empty-log">Tankbeurten laden…</li>'; return; }
     if (!s.points.length) { ul.innerHTML = '<li class="empty-log">Nog niets ingevuld.</li>'; return; }
-    const html = s.points.slice().reverse().map((p) => {
+    const all = s.points.slice().reverse();
+    const html = (state.logAll ? all : all.slice(0, 5)).map((p) => {
       const e = p.e;
       const d = p.verbruik - s.avg;
       const cls = Math.abs(d) < 0.05 ? "flat" : d < 0 ? "good" : "bad";
@@ -888,6 +935,9 @@ input[aria-invalid="true"] { border-color: var(--bad); }
         '<span class="acts">' + acts + "</span></li>";
     }).join("");
     ul.innerHTML = html;
+    const more = el("logMore");
+    more.hidden = all.length <= 5;
+    more.textContent = state.logAll ? "Toon minder" : "Toon alle " + all.length + " tankbeurten";
   }
 
   /* ---------- Oliecheck ---------- */
@@ -913,6 +963,8 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     el("oilFill").dataset.state = due ? "bad" : soon ? "warn" : "good";
     el("oilBar").setAttribute("aria-valuenow", String(Math.round(pct)));
     el("oilCard").classList.toggle("due", due);
+    setFold("oil", due || soon);
+    el("oilSum").textContent = due ? "" : "nog " + f0.format(o.left) + " km";
     el("oilMain").innerHTML = due
       ? (-o.left < 1 ? "Het is tijd voor een oliecheck." : "Je bent <b class=\"num\">" + f0.format(-o.left) + " km</b> over je oliecheck heen.") + " Controleer het oliepeil bij je volgende stop."
       : "Nog <b class=\"num\">" + f0.format(o.left) + " km</b> tot je volgende oliecheck.";
@@ -965,6 +1017,8 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     el("chgFill").dataset.state = due ? "bad" : soon ? "warn" : "good";
     el("chgBar").setAttribute("aria-valuenow", String(Math.round(pct)));
     el("chgCard").classList.toggle("due", due);
+    setFold("chg", due || soon);
+    el("chgSum").textContent = due ? "" : c.kmLeft > 0 ? "nog " + f0.format(c.kmLeft) + " km" : "";
     const when = c.daysLeft == null ? "" : c.daysLeft >= 60 ? Math.round(c.daysLeft / 30.4) + " maanden" : c.daysLeft + (c.daysLeft === 1 ? " dag" : " dagen");
     let main;
     if (due) {
@@ -1027,12 +1081,14 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     }).join("");
   }
   function renderFluids(real) {
+    let dueN = 0, soonN = 0;
     VLOEISTOFFEN.forEach((f) => {
       const id = (s) => "fl-" + f.key + "-" + s;
       const c = fluidCfg(f), t = trackInfo(real, "vloeistof-" + f.key, c.km, c.mnd);
       const kmDue = t.kmLeft != null && t.kmLeft <= 0, dateDue = t.daysLeft != null && t.daysLeft <= 0;
       const due = kmDue || dateDue;
       const soon = !due && ((t.kmLeft != null && t.kmLeft <= c.km * 0.1) || (t.daysLeft != null && t.daysLeft <= 30));
+      if (due) dueN++; else if (soon) soonN++;
       const kmPct = t.kmLeft != null ? (t.since / c.km) * 100 : 0;
       const timePct = t.daysLeft != null && t.totalDays > 0 ? ((t.totalDays - t.daysLeft) / t.totalDays) * 100 : 0;
       const pct = Math.max(0, Math.min(100, Math.max(kmPct, timePct)));
@@ -1062,6 +1118,10 @@ input[aria-invalid="true"] { border-color: var(--bad); }
       if (document.activeElement !== el(id("km"))) el(id("km")).value = String(c.km);
       if (document.activeElement !== el(id("mnd"))) el(id("mnd")).value = String(c.mnd);
     });
+    const fchip = el("flChip");
+    fchip.className = "chip " + (dueN ? "bad" : soonN ? "warn" : "good");
+    fchip.textContent = dueN ? dueN + " nu doen" : soonN ? "Binnenkort" : "Alles op tijd";
+    setFold("fl", dueN + soonN > 0);
   }
 
   /* ---------- Tankstation: snelkeuze en vorige prijs ---------- */
@@ -1101,6 +1161,22 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     btn.dataset.prijs = String(last.prijs);
     btn.textContent = "Vorige keer € " + f3.format(last.prijs) + " per liter. Invullen";
     btn.hidden = false;
+  }
+
+  /* ---------- Inklappen, logboek, melding ---------- */
+  state.fold = { oil: null, chg: null, fl: null };
+  state.logAll = false;
+  function setFold(key, attention) {
+    const open = state.fold[key] != null ? state.fold[key] : attention;
+    el(key + "Fold").hidden = !open;
+    el(key + "Head").setAttribute("aria-expanded", String(open));
+  }
+  let toastTimer;
+  function showToast(msg) {
+    const t = el("toast");
+    t.textContent = msg; t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.hidden = true; }, 3500);
   }
 
   /* ---------- Reiskosten ---------- */
@@ -1420,6 +1496,7 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     try {
       await saveEntry(entry);
       resetForm();
+      showToast(old ? "Wijziging opgeslagen." : "Tankbeurt opgeslagen: " + f1.format(lp100(entry)) + " L/100 km");
     } catch (e) {
       if (e && e.code === "invalid_argument") { err.textContent = "Je kunt in dit tankboek alleen kijken, niet opslaan."; state.readOnly = true; render(); }
       else if (e && e.code === "quota_exceeded") err.textContent = "Het tankboek is vol. Verwijder oude tankbeurten om ruimte te maken.";
@@ -1478,7 +1555,7 @@ input[aria-invalid="true"] { border-color: var(--bad); }
   async function oilSave(entry, errId) {
     const err = el(errId || "oilErr");
     if (state.mode === "loading") { err.textContent = "Even geduld, je tankboek wordt nog geladen."; return false; }
-    try { await saveEntry(entry); err.textContent = ""; return true; }
+    try { await saveEntry(entry); err.textContent = ""; showToast("Opgeslagen."); return true; }
     catch (e) {
       err.textContent = e && e.code === "invalid_argument" ? "Je kunt in dit tankboek alleen kijken, niet opslaan."
         : e && e.code === "local_failed" ? "Deze browser staat opslaan niet toe (privévenster?). Je oliecheck is niet bewaard."
@@ -1591,6 +1668,14 @@ input[aria-invalid="true"] { border-color: var(--bad); }
       showTab(TABS[(TABS.indexOf(t) + (ev.key === "ArrowRight" ? 1 : TABS.length - 1)) % TABS.length], true);
     });
   });
+  ["oil", "chg", "fl"].forEach((key) => {
+    const head = el(key + "Head"), body = el(key + "Fold");
+    const toggle = () => { state.fold[key] = body.hidden; setFold(key, false); };
+    head.addEventListener("click", toggle);
+    head.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); toggle(); } });
+    ["pointerdown", "focusin"].forEach((evt) => body.addEventListener(evt, () => { if (state.fold[key] == null) state.fold[key] = true; }));
+  });
+  el("logMore").addEventListener("click", () => { state.logAll = !state.logAll; render(); });
   el("t-zoek").addEventListener("click", zoekRoute);
   ["t-van", "t-naar"].forEach((id) => el(id).addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); zoekRoute(); } }));
   el("t-km").addEventListener("input", () => { state.trip.duur = null; updateTrip(); });
