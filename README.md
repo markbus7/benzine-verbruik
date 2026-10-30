@@ -31,3 +31,15 @@ Je tankbeurten staan dan in `data/tankbeurten.json` in die privé-repository en 
 - De token blijft alleen in de browser staan waarin je hem plakt.
 - Elke wijziging maakt een commit in de gegevens-repository. Wijzigen en verwijderen werken ook tussen apparaten.
 - Gebruik geen openbare repository voor de gegevens: daar kan iedereen het bestand lezen.
+
+## Versies
+
+Het versienummer staat bovenaan de pagina, onder de naam van de auto. Zo zie je of GitHub Pages de nieuwste versie toont.
+
+- **1.6** (30 okt 2026): versienummer op de pagina
+- **1.5** (30 okt 2026): formulier bovenaan, snelkeuze tankstation, tabblad Reiskosten, telefoonvriendelijk
+- **1.4** (17 okt 2026): vloeistoffen (koel-, rem- en ruitensproeiervloeistof)
+- **1.3** (17 okt 2026): olie verversen
+- **1.2** (17 okt 2026): oliecheck
+- **1.1** (14 okt 2026): synchroniseren met GitHub
+- **1.0** (14 okt 2026): eerste versie van het Tankboek
