@@ -90,6 +90,32 @@ h1 span { color: var(--accent); }
 .chips button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .chips button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .prijsfill { justify-self: start; text-align: left; padding-left: 0; }
+
+/* Tabbladen en reiskosten */
+.panel { display: grid; gap: 20px; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+.tabs button {
+  font-family: var(--font-display); font-weight: 600; font-size: 1.3rem; letter-spacing: 0.01em;
+  background: none; border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px;
+  color: var(--muted); padding: 6px 14px 4px; cursor: pointer;
+}
+.tabs button:hover { color: var(--ink); }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
+.trip-form { display: grid; gap: 14px; }
+.trip-grid {
+  display: grid; gap: 20px; align-items: start;
+  grid-template-columns: minmax(0, 340px) minmax(0, 1fr);
+  grid-template-areas: "route result" "calc calc";
+}
+.trip-route { grid-area: route; }
+.trip-result { grid-area: result; min-width: 0; }
+.trip-calc { grid-area: calc; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+@media (max-width: 820px) {
+  .trip-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "route" "result" "calc"; }
+}
+.trip-sum { color: var(--muted); font-size: 0.9rem; margin: 14px 0 0; }
+.trip-sum .num { color: var(--ink); }
 input.text { font-family: var(--font-body); padding-right: 12px; }
 .status {
   font-size: 0.8rem; color: var(--muted);
@@ -300,6 +326,12 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     <span class="status" id="status" data-state="">Laden…</span>
   </header>
 
+  <div class="tabs" role="tablist" aria-label="Onderdeel">
+    <button type="button" role="tab" id="tab-tank" aria-selected="true" aria-controls="panel-tank">Tankboek</button>
+    <button type="button" role="tab" id="tab-reis" aria-selected="false" aria-controls="panel-reis" tabindex="-1">Reiskosten</button>
+  </div>
+
+  <div class="panel" id="panel-tank" role="tabpanel" aria-labelledby="tab-tank">
   <div class="banner" id="sampleBanner" hidden>
     <strong>Voorbeeldgegevens.</strong> Zo ziet je tankboek eruit met een paar maanden aan tankbeurten. Sla je eerste eigen tankbeurt op en de voorbeelden verdwijnen.
   </div>
@@ -434,6 +466,46 @@ input[aria-invalid="true"] { border-color: var(--bad); }
       <ul class="log" id="log"></ul>
     </section>
 
+  <p class="foot" id="foot"></p>
+  </div>
+
+  <div class="panel" id="panel-reis" role="tabpanel" aria-labelledby="tab-reis" hidden>
+    <section class="card" aria-labelledby="tripTitle">
+      <div class="card-head"><h2 id="tripTitle">Wat kost de reis?</h2></div>
+      <div class="trip-grid">
+        <div class="trip-form trip-route">
+          <div class="field">
+            <label for="t-van">Van <span class="opt">(plaats of adres)</span></label>
+            <input type="text" class="text" id="t-van" placeholder="Arnhem" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="t-naar">Naar</label>
+            <input type="text" class="text" id="t-naar" placeholder="Amsterdam" autocomplete="off">
+          </div>
+          <button class="btn ghost" type="button" id="t-zoek">Afstand opzoeken</button>
+          <p class="hint" id="t-info" role="status">Of vul hieronder zelf de kilometers in. Bij opzoeken gaan Van en Naar naar OpenStreetMap en OSRM, twee gratis routediensten.</p>
+          <div class="field">
+            <label for="t-km">Kilometers, enkele reis</label>
+            <div class="input-unit"><input type="text" inputmode="decimal" id="t-km" placeholder="99" autocomplete="off"><span>km</span></div>
+          </div>
+        </div>
+        <div class="trip-result" id="t-result" aria-live="polite"></div>
+        <div class="trip-calc">
+          <div class="field">
+            <label for="t-verbruik">Verbruik</label>
+            <div class="chips" id="t-v-chips" role="group" aria-label="Snelkeuze verbruik"></div>
+            <div class="input-unit"><input type="text" inputmode="decimal" id="t-verbruik" placeholder="6,5" autocomplete="off"><span>L/100 km</span></div>
+          </div>
+          <div class="field">
+            <label for="t-prijs">Literprijs</label>
+            <div class="chips" id="t-p-chips" role="group" aria-label="Snelkeuze literprijs"></div>
+            <div class="input-unit"><input type="text" inputmode="decimal" id="t-prijs" placeholder="2,000" autocomplete="off"><span>€/L</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
   <details class="card sync" id="syncCard" hidden>
     <summary><h2>Synchroniseren met GitHub</h2><span class="syncstate" id="syncState">Niet gekoppeld</span></summary>
     <div class="sync-body">
@@ -462,7 +534,7 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     </div>
   </details>
 
-  <p class="foot" id="foot"></p>
+  
 </div>
 
 <script>
@@ -750,6 +822,7 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     renderFluids(real);
     renderStationChips();
     updatePrijsHint();
+    renderTrip();
 
     renderKpis(s, rows, state.mode === "loading");
     renderLog(s, sample);
@@ -1028,6 +1101,110 @@ input[aria-invalid="true"] { border-color: var(--bad); }
     btn.dataset.prijs = String(last.prijs);
     btn.textContent = "Vorige keer € " + f3.format(last.prijs) + " per liter. Invullen";
     btn.hidden = false;
+  }
+
+  /* ---------- Reiskosten ---------- */
+  state.trip = { vMode: "gem", pMode: "laatste", duur: null };
+  function renderChips(boxId, opts, active) {
+    const box = el(boxId);
+    box.textContent = "";
+    opts.forEach((o) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.dataset.mode = o.mode; b.textContent = o.label + " " + o.text;
+      b.setAttribute("aria-pressed", String(o.mode === active));
+      box.appendChild(b);
+    });
+  }
+  function renderTrip() {
+    const rows = sorted(state.items), s = stats(rows), T = state.trip;
+    const lastP = rows.slice().reverse().find((e) => e.prijs > 0);
+    const defV = { gem: rows.length ? s.avg : null, l5: rows.length ? s.avg5 : null };
+    const defP = { laatste: lastP ? lastP.prijs : null, gem: s.avgPrijs };
+    renderChips("t-v-chips", [
+      { mode: "gem", label: "Gemiddeld", v: defV.gem, text: defV.gem != null ? f1.format(defV.gem) : "" },
+      { mode: "l5", label: "Laatste 5", v: defV.l5, text: defV.l5 != null ? f1.format(defV.l5) : "" }
+    ].filter((o) => o.v != null), T.vMode);
+    renderChips("t-p-chips", [
+      { mode: "laatste", label: "Laatste", v: defP.laatste, text: defP.laatste != null ? "€ " + f3.format(defP.laatste) : "" },
+      { mode: "gem", label: "Gemiddeld", v: defP.gem, text: defP.gem != null ? "€ " + f3.format(defP.gem) : "" }
+    ].filter((o) => o.v != null), T.pMode);
+    if (T.vMode !== "zelf" && defV[T.vMode] != null && document.activeElement !== el("t-verbruik")) el("t-verbruik").value = f2.format(defV[T.vMode]);
+    if (T.pMode !== "zelf" && defP[T.pMode] != null && document.activeElement !== el("t-prijs")) el("t-prijs").value = f3.format(defP[T.pMode]);
+    updateTrip();
+  }
+  function updateTrip() {
+    const km = parseNum(el("t-km").value), v = parseNum(el("t-verbruik").value), p = parseNum(el("t-prijs").value);
+    const box = el("t-result");
+    const missing = [];
+    if (!(km > 0)) missing.push("de kilometers (of een route)");
+    if (!(v > 0)) missing.push("je verbruik");
+    if (!(p > 0)) missing.push("de literprijs");
+    if (missing.length) {
+      box.innerHTML = '<p class="empty-chart">Vul ' + missing.join(", ").replace(/, ([^,]*)$/, " en $1") + " in om de kosten te zien.</p>";
+      return;
+    }
+    if (km > 20000 || v > 60 || p > 10) { box.innerHTML = '<p class="empty-chart">Controleer de ingevulde getallen.</p>'; return; }
+    const liters = (km * v) / 100, euro = liters * p;
+    const kmText = (x) => (Math.abs(x - Math.round(x)) < 0.05 ? f0 : f1).format(x);
+    const tile = (label, mult, lead) =>
+      '<div class="kpi' + (lead ? " lead" : "") + '"><span class="label">' + label + "</span>" +
+      '<span class="big num">' + eur.format(euro * mult).replace(/\s/g, " ") + "</span>" +
+      '<span class="meta num">' + kmText(km * mult) + " km · " + f1.format(liters * mult) + " L</span></div>";
+    box.innerHTML = '<div class="kpis">' + tile("Enkele reis", 1, false) + tile("Retour", 2, true) + "</div>" +
+      '<p class="trip-sum"><span class="num">' + f1.format(km) + " km × " + f2.format(v) + " L/100 km = " + f1.format(liters) +
+      " L × € " + f3.format(p) + "</span> per liter. Op de snelweg verbruik je vaak meer dan je gemiddelde.</p>";
+  }
+  function fmtDuur(sec) {
+    const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60);
+    return h ? h + " u " + (m ? m + " min" : "") : m + " min";
+  }
+  async function geocode(q) {
+    const res = await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=nl&q=" + encodeURIComponent(q));
+    if (!res.ok) throw { status: res.status };
+    const j = await res.json();
+    if (!j.length) throw { notFound: q };
+    return { lat: j[0].lat, lon: j[0].lon, naam: String(j[0].display_name || q).split(",").slice(0, 2).join(",").trim() };
+  }
+  async function zoekRoute() {
+    const van = el("t-van").value.trim(), naar = el("t-naar").value.trim();
+    const info = el("t-info"), btn = el("t-zoek");
+    if (!van || !naar) { info.textContent = "Vul bij Van en Naar een plaats of adres in, of vul zelf de kilometers in."; return; }
+    btn.disabled = true;
+    info.textContent = "Route opzoeken…";
+    try {
+      const a = await geocode(van);
+      const b = await geocode(naar);
+      const res = await fetch("https://router.project-osrm.org/route/v1/driving/" + a.lon + "," + a.lat + ";" + b.lon + "," + b.lat + "?overview=false");
+      if (!res.ok) throw { status: res.status };
+      const j = await res.json();
+      if (j.code !== "Ok" || !j.routes || !j.routes.length) throw { geenRoute: true };
+      const km = j.routes[0].distance / 1000;
+      el("t-km").value = f1.format(km);
+      state.trip.duur = j.routes[0].duration;
+      info.textContent = a.naam + " naar " + b.naam + ": " + f1.format(km) + " km, ongeveer " + fmtDuur(j.routes[0].duration) + " rijden. Je kunt de kilometers hieronder nog aanpassen.";
+      updateTrip();
+    } catch (e) {
+      info.textContent = e && e.notFound ? "Ik kan \"" + e.notFound + "\" niet vinden. Probeer een plaats of adres, of vul zelf de kilometers in."
+        : e && e.geenRoute ? "Er is geen autoroute gevonden tussen deze plaatsen. Vul zelf de kilometers in."
+        : e && e.status === 429 ? "De routedienst is even druk. Probeer het zo nog eens of vul zelf de kilometers in."
+        : "Opzoeken lukt nu niet. Vul zelf de kilometers in.";
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  /* ---------- Tabbladen ---------- */
+  const TABS = ["tank", "reis"];
+  function showTab(name, focus) {
+    TABS.forEach((t) => {
+      const on = t === name;
+      el("tab-" + t).setAttribute("aria-selected", String(on));
+      el("tab-" + t).tabIndex = on ? 0 : -1;
+      el("panel-" + t).hidden = !on;
+    });
+    try { localStorage.setItem("tankboek.tab", name); } catch (e) { /* niets te doen */ }
+    if (name === "reis") renderTrip();
+    if (focus) el("tab-" + name).focus();
   }
 
   /* ---------- Grafiek ---------- */
@@ -1405,6 +1582,33 @@ input[aria-invalid="true"] { border-color: var(--bad); }
       });
     });
   });
+
+  TABS.forEach((t) => {
+    el("tab-" + t).addEventListener("click", () => showTab(t, false));
+    el("tab-" + t).addEventListener("keydown", (ev) => {
+      if (ev.key !== "ArrowRight" && ev.key !== "ArrowLeft") return;
+      ev.preventDefault();
+      showTab(TABS[(TABS.indexOf(t) + (ev.key === "ArrowRight" ? 1 : TABS.length - 1)) % TABS.length], true);
+    });
+  });
+  el("t-zoek").addEventListener("click", zoekRoute);
+  ["t-van", "t-naar"].forEach((id) => el(id).addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); zoekRoute(); } }));
+  el("t-km").addEventListener("input", () => { state.trip.duur = null; updateTrip(); });
+  el("t-verbruik").addEventListener("input", () => { state.trip.vMode = "zelf"; renderTrip(); });
+  el("t-prijs").addEventListener("input", () => { state.trip.pMode = "zelf"; renderTrip(); });
+  el("t-v-chips").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button[data-mode]");
+    if (b) { state.trip.vMode = b.dataset.mode; renderTrip(); }
+  });
+  el("t-p-chips").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button[data-mode]");
+    if (b) { state.trip.pMode = b.dataset.mode; renderTrip(); }
+  });
+  let startTab = "tank";
+  try { startTab = localStorage.getItem("tankboek.tab") || "tank"; } catch (e) { /* niets te doen */ }
+  if (location.hash === "#reiskosten") startTab = "reis";
+  if (TABS.indexOf(startTab) < 0) startTab = "tank";
+  showTab(startTab, false);
 
   el("gSave").addEventListener("click", () => {
     const g = state.gh;
