@@ -104,6 +104,17 @@ h1 span { color: var(--accent); }
 .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
 .tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
 .trip-form { display: grid; gap: 14px; }
+.ac { position: relative; }
+.ac-list {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 15;
+  list-style: none; margin: 0; padding: 4px; max-height: 320px; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+}
+.ac-list li { padding: 10px 12px; border-radius: 8px; cursor: pointer; min-height: 44px; display: grid; gap: 1px; }
+.ac-list li:hover, .ac-list li[aria-selected="true"] { background: var(--sunk); }
+.ac-list li b { font-weight: 600; }
+.ac-list li span { color: var(--muted); font-size: 0.85rem; }
 .trip-grid {
   display: grid; gap: 20px; align-items: start;
   grid-template-columns: minmax(0, 340px) minmax(0, 1fr);
@@ -359,7 +370,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     <div>
       <h1>Tank<span>boek</span></h1>
       <p class="sub"><strong class="car">Mazda 2 Touring · 2007</strong> · Vul na elke tankbeurt in hoeveel je getankt en gereden hebt.</p>
-      <p class="ver" id="versie">Versie 1.6 · 30 okt 2026</p>
+      <p class="ver" id="versie">Versie 1.7 · 30 okt 2026</p>
     </div>
     <span class="status" id="status" data-state="">Laden…</span>
   </header>
@@ -521,14 +532,14 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
         <div class="trip-form trip-route">
           <div class="field">
             <label for="t-van">Van <span class="opt">(plaats of adres)</span></label>
-            <input type="text" class="text" id="t-van" placeholder="Arnhem" autocomplete="off">
+            <div class="ac"><input type="text" class="text" id="t-van" placeholder="Arnhem Centraal" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="t-van-list"><ul class="ac-list" id="t-van-list" role="listbox" aria-label="Suggesties voor Van" hidden></ul></div>
           </div>
           <div class="field">
             <label for="t-naar">Naar</label>
-            <input type="text" class="text" id="t-naar" placeholder="Amsterdam" autocomplete="off">
+            <div class="ac"><input type="text" class="text" id="t-naar" placeholder="Amsterdam Centraal" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="t-naar-list"><ul class="ac-list" id="t-naar-list" role="listbox" aria-label="Suggesties voor Naar" hidden></ul></div>
           </div>
           <button class="btn ghost" type="button" id="t-zoek">Afstand opzoeken</button>
-          <p class="hint" id="t-info" role="status">Of vul hieronder zelf de kilometers in. Bij opzoeken gaan Van en Naar naar OpenStreetMap en OSRM, twee gratis routediensten.</p>
+          <p class="hint" id="t-info" role="status">Typ minstens 3 letters en kies een suggestie, of vul hieronder zelf de kilometers in. Wat je typt gaat naar Photon (OpenStreetMap) en OSRM, twee gratis diensten. Er wordt alleen in Europa gezocht.</p>
           <div class="field">
             <label for="t-km">Kilometers, enkele reis</label>
             <div class="input-unit"><input type="text" inputmode="decimal" id="t-km" placeholder="99" autocomplete="off"><span>km</span></div>
@@ -1182,7 +1193,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
   }
 
   /* ---------- Reiskosten ---------- */
-  state.trip = { vMode: "gem", pMode: "laatste", duur: null };
+  state.trip = { vMode: "gem", pMode: "laatste", duur: null, pick: { van: null, naar: null } };
   function renderChips(boxId, opts, active) {
     const box = el(boxId);
     box.textContent = "";
@@ -1236,12 +1247,87 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60);
     return h ? h + " u " + (m ? m + " min" : "") : m + " min";
   }
-  async function geocode(q) {
-    const res = await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=nl&q=" + encodeURIComponent(q));
+  // Photon (OpenStreetMap) is bedoeld voor zoeken tijdens het typen. Alleen Europa, met voorkeur voor Nederland.
+  const PHOTON = "https://photon.komoot.io/api/";
+  const EUROPA = "-11,35,30,61";
+  async function photon(q, limit, signal) {
+    const url = PHOTON + "?limit=" + limit + "&bbox=" + EUROPA + "&lat=52.1&lon=5.3&q=" + encodeURIComponent(q);
+    const res = await fetch(url, { signal });
     if (!res.ok) throw { status: res.status };
     const j = await res.json();
-    if (!j.length) throw { notFound: q };
-    return { lat: j[0].lat, lon: j[0].lon, naam: String(j[0].display_name || q).split(",").slice(0, 2).join(",").trim() };
+    const seen = new Set();
+    return (j.features || []).map((f) => {
+      const p = f.properties || {}, c = (f.geometry && f.geometry.coordinates) || [];
+      const naam = p.name || [p.street, p.housenumber].filter(Boolean).join(" ") || p.city || q;
+      const sub = [p.city && p.city !== naam ? p.city : null, p.state, p.country && p.country !== "Nederland" ? p.country : null]
+        .filter((x, i, arr) => x && arr.indexOf(x) === i).join(", ");
+      return { lon: c[0], lat: c[1], naam, sub };
+    }).filter((it) => {
+      const k = it.naam + "|" + it.sub;
+      if (it.lat == null || seen.has(k)) return false;
+      seen.add(k); return true;
+    });
+  }
+  const placeText = (it) => it.naam + (it.sub ? ", " + it.sub : "");
+  function setupAc(key) {
+    const inp = el("t-" + key), list = el("t-" + key + "-list");
+    let timer = null, ctrl = null, items = [], active = -1;
+    function draw() {
+      list.textContent = "";
+      items.forEach((it, i) => {
+        const li = document.createElement("li");
+        li.id = list.id + "-" + i;
+        li.setAttribute("role", "option");
+        li.setAttribute("aria-selected", String(i === active));
+        const b = document.createElement("b"); b.textContent = it.naam; li.appendChild(b);
+        if (it.sub) { const sp = document.createElement("span"); sp.textContent = it.sub; li.appendChild(sp); }
+        li.addEventListener("pointerdown", (ev) => { ev.preventDefault(); choose(i); });
+        list.appendChild(li);
+      });
+      const open = items.length > 0;
+      list.hidden = !open;
+      inp.setAttribute("aria-expanded", String(open));
+      if (open && active >= 0) inp.setAttribute("aria-activedescendant", list.id + "-" + active);
+      else inp.removeAttribute("aria-activedescendant");
+    }
+    function close() { items = []; active = -1; draw(); }
+    function choose(i) {
+      const it = items[i];
+      state.trip.pick[key] = it;
+      inp.value = placeText(it);
+      close();
+      if (state.trip.pick.van && state.trip.pick.naar) zoekRoute();
+    }
+    inp.addEventListener("input", () => {
+      state.trip.pick[key] = null;
+      clearTimeout(timer);
+      if (ctrl) ctrl.abort();
+      const q = inp.value.trim();
+      if (q.length < 3) { close(); return; }
+      timer = setTimeout(async () => {
+        ctrl = new AbortController();
+        try {
+          const found = await photon(q, 6, ctrl.signal);
+          if (document.activeElement !== inp || inp.value.trim() !== q) return;
+          items = found; active = -1; draw();
+        } catch (e) {
+          if (!(e && e.name === "AbortError")) close();
+        }
+      }, 300);
+    });
+    inp.addEventListener("keydown", (ev) => {
+      const open = !list.hidden && items.length > 0;
+      if (ev.key === "ArrowDown" && open) { ev.preventDefault(); active = active < items.length - 1 ? active + 1 : 0; draw(); }
+      else if (ev.key === "ArrowUp" && open) { ev.preventDefault(); active = active > 0 ? active - 1 : items.length - 1; draw(); }
+      else if (ev.key === "Escape" && open) { ev.preventDefault(); close(); }
+      else if (ev.key === "Enter") { ev.preventDefault(); if (open) choose(active >= 0 ? active : 0); else zoekRoute(); }
+    });
+    inp.addEventListener("blur", () => setTimeout(close, 150));
+  }
+  async function firstPlace(q) {
+    const found = await photon(q, 1);
+    if (!found.length) throw { notFound: q };
+    return found[0];
   }
   async function zoekRoute() {
     const van = el("t-van").value.trim(), naar = el("t-naar").value.trim();
@@ -1250,8 +1336,8 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     btn.disabled = true;
     info.textContent = "Route opzoeken…";
     try {
-      const a = await geocode(van);
-      const b = await geocode(naar);
+      const a = state.trip.pick.van || await firstPlace(van);
+      const b = state.trip.pick.naar || await firstPlace(naar);
       const res = await fetch("https://router.project-osrm.org/route/v1/driving/" + a.lon + "," + a.lat + ";" + b.lon + "," + b.lat + "?overview=false");
       if (!res.ok) throw { status: res.status };
       const j = await res.json();
@@ -1259,12 +1345,13 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
       const km = j.routes[0].distance / 1000;
       el("t-km").value = f1.format(km);
       state.trip.duur = j.routes[0].duration;
-      info.textContent = a.naam + " naar " + b.naam + ": " + f1.format(km) + " km, ongeveer " + fmtDuur(j.routes[0].duration) + " rijden. Je kunt de kilometers hieronder nog aanpassen.";
+      info.textContent = placeText(a) + " naar " + placeText(b) + ": " + f1.format(km) + " km, ongeveer " + fmtDuur(j.routes[0].duration) + " rijden." +
+        (km > 1000 ? " Dat is erg ver. Klopt de plaats? Kies anders een suggestie uit het lijstje." : " Je kunt de kilometers hieronder nog aanpassen.");
       updateTrip();
     } catch (e) {
-      info.textContent = e && e.notFound ? "Ik kan \"" + e.notFound + "\" niet vinden. Probeer een plaats of adres, of vul zelf de kilometers in."
+      info.textContent = e && e.notFound ? "Ik kan \"" + e.notFound + "\" niet vinden. Typ iets anders en kies een suggestie, of vul zelf de kilometers in."
         : e && e.geenRoute ? "Er is geen autoroute gevonden tussen deze plaatsen. Vul zelf de kilometers in."
-        : e && e.status === 429 ? "De routedienst is even druk. Probeer het zo nog eens of vul zelf de kilometers in."
+        : e && e.status === 429 ? "De zoekdienst is even druk. Probeer het zo nog eens of vul zelf de kilometers in."
         : "Opzoeken lukt nu niet. Vul zelf de kilometers in.";
     } finally {
       btn.disabled = false;
@@ -1679,7 +1766,8 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
   });
   el("logMore").addEventListener("click", () => { state.logAll = !state.logAll; render(); });
   el("t-zoek").addEventListener("click", zoekRoute);
-  ["t-van", "t-naar"].forEach((id) => el(id).addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); zoekRoute(); } }));
+  setupAc("van");
+  setupAc("naar");
   el("t-km").addEventListener("input", () => { state.trip.duur = null; updateTrip(); });
   el("t-verbruik").addEventListener("input", () => { state.trip.vMode = "zelf"; renderTrip(); });
   el("t-prijs").addEventListener("input", () => { state.trip.pMode = "zelf"; renderTrip(); });

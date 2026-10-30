@@ -13,7 +13,7 @@ Open `index.html` in je browser. Je ziet dan:
 - een oliecheck: het Tankboek telt de kilometers van je tankbeurten en waarschuwt als het tijd is om het oliepeil te controleren (standaard na 1.500 km, zelf aan te passen)
 - olie verversen: houdt de laatste verversing bij en waarschuwt na een instelbaar aantal kilometers of maanden, wat het eerst komt (standaard 15.000 km of 12 maanden)
 - vloeistoffen: koelvloeistof, remvloeistof en ruitensproeiervloeistof, elk met een eigen waarschuwing na een instelbaar aantal kilometers en/of maanden (een veld op 0 zet dat deel uit)
-- tabblad **Reiskosten**: vul de kilometers in, of zoek de afstand op tussen twee plaatsen, en zie wat een enkele reis en een retour kosten, op basis van je eigen verbruik en literprijs. Het opzoeken gebruikt OpenStreetMap (Nominatim) en OSRM en werkt alleen in de losse versie op GitHub Pages
+- tabblad **Reiskosten**: vul de kilometers in, of zoek de afstand op tussen twee plaatsen, en zie wat een enkele reis en een retour kosten, op basis van je eigen verbruik en literprijs. Bij het typen krijg je suggesties (bijvoorbeeld Amsterdam Centraal, Zuid of Sloterdijk); er wordt alleen in Europa gezocht. Het opzoeken gebruikt Photon (OpenStreetMap) en OSRM en werkt alleen in de losse versie op GitHub Pages
 - gemaakt voor de telefoon: tabbladen onderaan binnen duimbereik, grote knoppen en velden, onderhoud dat inklapt en vanzelf opent als er iets moet, een logboek met de laatste 5 tankbeurten en een bevestiging na het opslaan
 
 In deze losse versie worden je tankbeurten in je browser bewaard (localStorage).
@@ -36,6 +36,7 @@ Je tankbeurten staan dan in `data/tankbeurten.json` in die privé-repository en 
 
 Het versienummer staat bovenaan de pagina, onder de naam van de auto. Zo zie je of GitHub Pages de nieuwste versie toont.
 
+- **1.7** (30 okt 2026): suggesties bij Van en Naar, alleen zoeken in Europa, route meteen opzoeken na het kiezen
 - **1.6** (30 okt 2026): versienummer op de pagina
 - **1.5** (30 okt 2026): formulier bovenaan, snelkeuze tankstation, tabblad Reiskosten, telefoonvriendelijk
 - **1.4** (17 okt 2026): vloeistoffen (koel-, rem- en ruitensproeiervloeistof)
