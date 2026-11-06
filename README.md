@@ -38,6 +38,7 @@ Je tankbeurten staan dan in `data/tankbeurten.json` in die privé-repository en 
 
 Het versienummer staat bovenaan de pagina, onder de naam van de auto. Zo zie je of GitHub Pages de nieuwste versie toont.
 
+- **1.12** (6 nov 2026): aantal tankbeurten per week en per maand
 - **1.11** (6 nov 2026): deeltank (niet volgetankt) telt mee bij de volgende volle tank; tabblad Prijzen met actuele Duitse tankprijzen via Tankerkönig en de netto besparing tegenover je laatste prijs
 - **1.10** (6 nov 2026): overzicht per week en per maand met kilometers, kosten en verbruik
 - **1.9** (6 nov 2026): onder de kerncijfers wat een volle, halve en kwart tank (45 L) kost en hoe ver je ermee komt
