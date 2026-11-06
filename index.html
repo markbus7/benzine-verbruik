@@ -328,6 +328,16 @@ input[aria-invalid="true"] { border-color: var(--bad); }
   .kpi .big, .log li { transition: color 0.2s; }
 }
 
+/* Tankinhoud */
+.tankstrip { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 16px 12px; display: grid; gap: 6px; }
+.ts-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; align-items: baseline; }
+.ts-note { color: var(--muted); font-size: 0.8rem; }
+.ts-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.ts-item { display: grid; gap: 0; min-width: 0; }
+.ts-item .ts-name { color: var(--muted); font-size: 0.8rem; }
+.ts-item b { font-family: var(--font-display); font-weight: 600; font-size: 1.25rem; line-height: 1.2; }
+.ts-item .num { font-size: 0.85rem; color: var(--muted); }
+
 /* Telefoon en aanraking */
 /* Safari (iPhone/iPad) geeft datumvelden een eigen minimale breedte en centreert de tekst */
 .field { min-width: 0; }
@@ -379,7 +389,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     <div>
       <h1>Tank<span>boek</span></h1>
       <p class="sub"><strong class="car">Mazda 2 Touring · 2007</strong> · Vul na elke tankbeurt in hoeveel je getankt en gereden hebt.</p>
-      <p class="ver" id="versie">Versie 1.8 · 30 okt 2026</p>
+      <p class="ver" id="versie">Versie 1.9 · 6 nov 2026</p>
     </div>
     <span class="status" id="status" data-state="">Laden…</span>
   </header>
@@ -395,6 +405,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
   </div>
 
   <section class="kpis" id="kpis" aria-label="Kerncijfers"></section>
+  <section class="tankstrip" id="tankStrip" aria-label="Wat een tank kost" hidden></section>
 
   <div class="cols">
     <section class="card" aria-labelledby="formTitle">
@@ -892,6 +903,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     renderTrip();
 
     renderKpis(s, rows, state.mode === "loading");
+    renderTank(s, rows);
     renderLog(s, sample);
     renderChart(s);
     el("foot").textContent = rows.length && !sample
@@ -1183,6 +1195,24 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     btn.dataset.prijs = String(last.prijs);
     btn.textContent = "Vorige keer € " + f3.format(last.prijs) + " per liter. Invullen";
     btn.hidden = false;
+  }
+
+  /* ---------- Tankinhoud: wat kost een volle, halve en kwart tank ---------- */
+  const TANK_L = 45;
+  function renderTank(s, rows) {
+    const box = el("tankStrip");
+    if (s.avg == null) { box.hidden = true; return; }
+    let prijs = null;
+    rows.forEach((e) => { if (e.prijs > 0) prijs = e.prijs; });
+    const parts = [["Vol", 1], ["Half", 0.5], ["Kwart", 0.25]].map((x) => {
+      const l = TANK_L * x[1], km = (l / s.avg) * 100;
+      return '<div class="ts-item"><span class="ts-name">' + x[0] + " · " + nf(x[1] === 0.25 ? 2 : x[1] === 0.5 ? 1 : 0).format(l) + " L</span>" +
+        (prijs ? "<b>" + eur.format(l * prijs).replace(/\s/g, " ") + "</b>" : "") +
+        '<span class="num">ca. ' + f0.format(Math.round(km / 5) * 5) + " km</span></div>";
+    }).join("");
+    box.innerHTML = '<div class="ts-head"><span class="label">Tank ' + TANK_L + ' L</span><span class="ts-note">bij ' + f1.format(s.avg) + " L/100 km" +
+      (prijs ? " en € " + f3.format(prijs) + " per liter" : "") + "</span></div>" + '<div class="ts-row">' + parts + "</div>";
+    box.hidden = false;
   }
 
   /* ---------- Inklappen, logboek, melding ---------- */
