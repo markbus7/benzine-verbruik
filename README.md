@@ -15,6 +15,8 @@ Open `index.html` in je browser. Je ziet dan:
 - vloeistoffen: koelvloeistof, remvloeistof en ruitensproeiervloeistof, elk met een eigen waarschuwing na een instelbaar aantal kilometers en/of maanden (een veld op 0 zet dat deel uit)
 - tabblad **Reiskosten**: vul de kilometers in, of zoek de afstand op tussen twee plaatsen, en zie wat een enkele reis en een retour kosten, op basis van je eigen verbruik en literprijs. Bij het typen krijg je suggesties (bijvoorbeeld Amsterdam Centraal, Zuid of Sloterdijk); er wordt alleen in Europa gezocht. Het opzoeken gebruikt Photon (OpenStreetMap) en OSRM en werkt alleen in de losse versie op GitHub Pages
 - gemaakt voor de telefoon: tabbladen onderaan binnen duimbereik, grote knoppen en velden, onderhoud dat inklapt en vanzelf opent als er iets moet, een logboek met de laatste 5 tankbeurten en een bevestiging na het opslaan
+- tank je een keer niet vol (bijvoorbeeld om in Duitsland bij te tanken), haal dan het vinkje "Tank helemaal vol" weg: die liters en kilometers tellen mee bij je volgende volle tank
+- tabblad **Prijzen**: actuele prijzen van Duitse tankstations in de buurt (via Tankerkönig, gratis sleutel nodig), met de netto besparing tegenover je laatste literprijs na aftrek van het omrijden. Voor Nederland is er geen gratis bron met actuele prijzen
 
 In deze losse versie worden je tankbeurten in je browser bewaard (localStorage).
 
@@ -36,6 +38,7 @@ Je tankbeurten staan dan in `data/tankbeurten.json` in die privé-repository en 
 
 Het versienummer staat bovenaan de pagina, onder de naam van de auto. Zo zie je of GitHub Pages de nieuwste versie toont.
 
+- **1.11** (6 nov 2026): deeltank (niet volgetankt) telt mee bij de volgende volle tank; tabblad Prijzen met actuele Duitse tankprijzen via Tankerkönig en de netto besparing tegenover je laatste prijs
 - **1.10** (6 nov 2026): overzicht per week en per maand met kilometers, kosten en verbruik
 - **1.9** (6 nov 2026): onder de kerncijfers wat een volle, halve en kwart tank (45 L) kost en hoe ver je ermee komt
 - **1.8** (30 okt 2026): datumvelden passen weer binnen het formulier op iPhone en iPad
