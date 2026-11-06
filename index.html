@@ -328,6 +328,31 @@ input[aria-invalid="true"] { border-color: var(--bad); }
   .kpi .big, .log li { transition: color 0.2s; }
 }
 
+/* Per week en maand */
+.per-seg { display: inline-flex; background: var(--sunk); border-radius: 8px; padding: 3px; gap: 2px; }
+.per-seg button {
+  font: inherit; font-size: 0.85rem; font-weight: 500; border: 0; background: transparent; color: var(--muted);
+  min-height: 38px; padding: 8px 16px; border-radius: 6px; cursor: pointer;
+}
+.per-seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 0.12); }
+.per-seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.per-avg { margin: 0 0 10px; font-size: 0.95rem; }
+.per-avg b { font-weight: 600; }
+.per-list { display: grid; }
+.per-row {
+  display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1.6fr) minmax(0, 0.95fr) minmax(0, 0.75fr);
+  gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); font-variant-numeric: tabular-nums;
+}
+.per-row.head { border-top: 0; padding-top: 0; color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
+.per-row .p-label { font-weight: 600; font-size: 0.92rem; min-width: 0; }
+.per-row .p-label small { display: block; color: var(--muted); font-weight: 400; font-size: 0.78rem; }
+.per-km { display: grid; gap: 3px; min-width: 0; font-family: var(--font-data); font-size: 0.9rem; }
+.per-km i { display: block; height: 6px; border-radius: 3px; background: var(--accent); opacity: 0.75; min-width: 2px; }
+.per-row .num { font-size: 0.9rem; text-align: right; }
+.per-row.head .num { text-align: right; font-family: inherit; font-size: 0.72rem; }
+.per-row .num { white-space: nowrap; }
+.per-row .p-label small { white-space: nowrap; }
+
 /* Tankinhoud */
 .tankstrip { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 16px 12px; display: grid; gap: 6px; }
 .ts-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; align-items: baseline; }
@@ -389,7 +414,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     <div>
       <h1>Tank<span>boek</span></h1>
       <p class="sub"><strong class="car">Mazda 2 Touring · 2007</strong> · Vul na elke tankbeurt in hoeveel je getankt en gereden hebt.</p>
-      <p class="ver" id="versie">Versie 1.9 · 6 nov 2026</p>
+      <p class="ver" id="versie">Versie 1.10 · 6 nov 2026</p>
     </div>
     <span class="status" id="status" data-state="">Laden…</span>
   </header>
@@ -465,6 +490,19 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     </div>
   </section>
   </div>
+
+  <section class="card" id="perCard" aria-labelledby="perTitle">
+    <div class="card-head">
+      <h2 id="perTitle">Per week en maand</h2>
+      <div class="per-seg" role="group" aria-label="Periode">
+        <button type="button" data-per="week" aria-pressed="true">Week</button>
+        <button type="button" data-per="maand" aria-pressed="false">Maand</button>
+      </div>
+    </div>
+    <p class="per-avg" id="perAvg"></p>
+    <div class="per-list" id="perList"></div>
+    <p class="hint" id="perNote">Kilometers en kosten zijn verdeeld over de dagen tussen je tankbeurten. De lopende week telt pas mee na je volgende tankbeurt.</p>
+  </section>
 
   <section class="card oil" id="oilCard" aria-labelledby="oilTitle">
     <div class="card-head fold-head" id="oilHead" role="button" tabindex="0" aria-expanded="false" aria-controls="oilFold">
@@ -904,6 +942,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
 
     renderKpis(s, rows, state.mode === "loading");
     renderTank(s, rows);
+    renderPeriods(rows);
     renderLog(s, sample);
     renderChart(s);
     el("foot").textContent = rows.length && !sample
@@ -1195,6 +1234,81 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     btn.dataset.prijs = String(last.prijs);
     btn.textContent = "Vorige keer € " + f3.format(last.prijs) + " per liter. Invullen";
     btn.hidden = false;
+  }
+
+  /* ---------- Per week en maand ---------- */
+  state.perMode = "week";
+  const dayDiff = (a, b) => Math.round((toDate(b) - toDate(a)) / 86400000);
+  function isoWeek(d) {
+    const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const day = t.getUTCDay() || 7;
+    t.setUTCDate(t.getUTCDate() + 4 - day);
+    const y = t.getUTCFullYear();
+    return [y, Math.ceil(((t - Date.UTC(y, 0, 1)) / 86400000 + 1) / 7)];
+  }
+  const monthFmt = new Intl.DateTimeFormat("nl-NL", { month: "short", year: "numeric" });
+  function periodBuckets(rows, mode) {
+    // Verdeel elke tankbeurt over de dagen sinds de vorige tankbeurt.
+    const spans = [];
+    for (let i = 1; i < rows.length; i++) { const d = dayDiff(rows[i - 1].datum, rows[i].datum); if (d > 0) spans.push(d); }
+    spans.sort((a, b) => a - b);
+    const firstSpan = spans.length ? spans[Math.floor(spans.length / 2)] : 14;
+    let pL = 0, pC = 0;
+    rows.forEach((e) => { if (e.prijs > 0) { pL += e.liters; pC += e.liters * e.prijs; } });
+    const avgPrice = pL ? pC / pL : null;
+    const map = new Map();
+    let daysCovered = 0, tKm = 0, tCost = 0, anyCost = false;
+    rows.forEach((e, i) => {
+      const days = Math.max(1, i > 0 ? dayDiff(rows[i - 1].datum, e.datum) : firstSpan);
+      daysCovered += i > 0 ? Math.max(0, dayDiff(rows[i - 1].datum, e.datum)) : firstSpan;
+      const price = e.prijs > 0 ? e.prijs : avgPrice, est = !(e.prijs > 0);
+      const cost = price != null ? e.liters * price : null;
+      tKm += e.km; if (cost != null) { tCost += cost; anyCost = true; }
+      for (let k = 0; k < days; k++) {
+        const d = toDate(e.datum); d.setDate(d.getDate() - k);
+        let key, label, sub = "";
+        if (mode === "week") {
+          const w = isoWeek(d), mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+          const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+          key = w[0] * 100 + w[1]; label = "Week " + w[1]; sub = (mon.getMonth() === sun.getMonth() ? mon.getDate() : shortFmt.format(mon)) + "–" + shortFmt.format(sun);
+        } else {
+          key = d.getFullYear() * 100 + d.getMonth(); label = monthFmt.format(d);
+        }
+        const b = map.get(key) || { key, label, sub, km: 0, l: 0, cost: 0, hasCost: false, est: false };
+        b.km += e.km / days; b.l += e.liters / days;
+        if (cost != null) { b.cost += cost / days; b.hasCost = true; if (est) b.est = true; }
+        map.set(key, b);
+      }
+    });
+    const list = Array.from(map.values()).sort((a, b) => b.key - a.key);
+    const per = mode === "week" ? 7 : 30.44;
+    return {
+      list,
+      avgKm: daysCovered ? (tKm / daysCovered) * per : null,
+      avgCost: daysCovered && anyCost ? (tCost / daysCovered) * per : null
+    };
+  }
+  function renderPeriods(rows) {
+    const card = el("perCard");
+    if (!rows.length) { card.hidden = true; return; }
+    card.hidden = false;
+    const mode = state.perMode, r = periodBuckets(rows, mode);
+    card.querySelectorAll(".per-seg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.per === mode)));
+    el("perAvg").innerHTML = "Gemiddeld per " + mode + ": <b class=\"num\">" + f0.format(r.avgKm) + " km</b>" +
+      (r.avgCost != null ? " en <b class=\"num\">" + eur.format(r.avgCost) + "</b>" : "");
+    const shown = r.list.slice(0, mode === "week" ? 8 : 12);
+    const max = Math.max.apply(null, shown.map((b) => b.km));
+    let anyEst = false;
+    el("perList").innerHTML = '<div class="per-row head"><span>' + (mode === "week" ? "Week" : "Maand") + '</span><span>Km</span><span class="num">Kosten</span><span class="num">L/100</span></div>' +
+      shown.map((b) => {
+        if (b.est) anyEst = true;
+        return '<div class="per-row"><span class="p-label">' + b.label + (b.sub ? "<small>" + b.sub + "</small>" : "") + "</span>" +
+          '<span class="per-km">' + f0.format(b.km) + '<i style="width:' + (max > 0 ? Math.max(2, (b.km / max) * 100) : 0).toFixed(1) + '%"></i></span>' +
+          '<span class="num">' + (b.hasCost ? (b.est ? "≈ " : "") + eur.format(b.cost).replace(/\s/g, " ") : "–") + "</span>" +
+          '<span class="num">' + (b.km > 0 ? f1.format((b.l / b.km) * 100) : "–") + "</span></div>";
+      }).join("");
+    el("perNote").textContent = "Kilometers en kosten zijn verdeeld over de dagen tussen je tankbeurten. De lopende " + mode + " telt pas helemaal mee na je volgende tankbeurt." +
+      (anyEst ? " ≈ is geschat met je gemiddelde literprijs, omdat bij een tankbeurt geen prijs is ingevuld." : "");
   }
 
   /* ---------- Tankinhoud: wat kost een volle, halve en kwart tank ---------- */
@@ -1804,6 +1918,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     ["pointerdown", "focusin"].forEach((evt) => body.addEventListener(evt, () => { if (state.fold[key] == null) state.fold[key] = true; }));
   });
   el("logMore").addEventListener("click", () => { state.logAll = !state.logAll; render(); });
+  el("perCard").querySelectorAll(".per-seg button").forEach((b) => b.addEventListener("click", () => { state.perMode = b.dataset.per; render(); }));
   el("t-zoek").addEventListener("click", zoekRoute);
   setupAc("van");
   setupAc("naar");
