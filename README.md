@@ -36,6 +36,7 @@ Je tankbeurten staan dan in `data/tankbeurten.json` in die privé-repository en 
 
 Het versienummer staat bovenaan de pagina, onder de naam van de auto. Zo zie je of GitHub Pages de nieuwste versie toont.
 
+- **1.9** (6 nov 2026): onder de kerncijfers wat een volle, halve en kwart tank (45 L) kost en hoe ver je ermee komt
 - **1.8** (30 okt 2026): datumvelden passen weer binnen het formulier op iPhone en iPad
 - **1.7** (30 okt 2026): suggesties bij Van en Naar, alleen zoeken in Europa, route meteen opzoeken na het kiezen
 - **1.6** (30 okt 2026): versienummer op de pagina
