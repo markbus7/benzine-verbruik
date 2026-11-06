@@ -361,6 +361,9 @@ input[aria-invalid="true"] { border-color: var(--bad); }
 
 /* Prijzen */
 .flabel { font-weight: 600; font-size: 0.88rem; }
+.two { align-items: start; }
+.chips { align-items: center; }
+.link, .chips button, .btn, .tabs button { -webkit-tap-highlight-color: transparent; }
 .pr-list { display: grid; margin-top: 4px; }
 .pr-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 12px 0; border-top: 1px solid var(--line); }
 .pr-row:first-child { border-top: 0; }
@@ -434,7 +437,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     <div>
       <h1>Tank<span>boek</span></h1>
       <p class="sub"><strong class="car">Mazda 2 Touring · 2007</strong> · Vul na elke tankbeurt in hoeveel je getankt en gereden hebt.</p>
-      <p class="ver" id="versie">Versie 1.12 · 6 nov 2026</p>
+      <p class="ver" id="versie">Versie 1.13 · 6 nov 2026</p>
     </div>
     <span class="status" id="status" data-state="">Laden…</span>
   </header>
@@ -672,6 +675,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
           <div class="field">
             <label for="pr-liters">Ik tank ongeveer</label>
             <div class="input-unit"><input type="text" inputmode="decimal" id="pr-liters" value="40" autocomplete="off"><span>L</span></div>
+            <button type="button" class="link prijsfill" id="pr-avgL" hidden></button>
           </div>
         </div>
         <button class="btn primary" type="button" id="pr-go">Duitse prijzen ophalen</button>
@@ -1619,15 +1623,23 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
   /* ---------- Prijzen (Duitse tankstations via Tankerkönig) ---------- */
   const LS_TK = "tankboek.v1.tankerkoenig";
   const DUIVEN = { lat: 51.9469, lng: 6.0175, naam: "Duiven" };
-  state.pr = { where: "duiven", pos: DUIVEN, type: "e10", rad: 25, key: "", result: null, cacheKey: "", cacheAt: 0, busy: false };
+  state.pr = { where: "duiven", pos: DUIVEN, type: "e10", rad: 25, key: "", result: null, cacheKey: "", cacheAt: 0, busy: false, litersTouched: false };
   try { state.pr.key = localStorage.getItem(LS_TK) || ""; } catch (e) { /* niets te doen */ }
   function priceRef() {
     let ref = null;
     sorted(state.items).forEach((e) => { if (e.prijs > 0) ref = e; });
     return ref;
   }
+  function avgLitersPerTank() {
+    const rows = sorted(state.items), full = rows.filter(isVol), use = full.length ? full : rows;
+    return use.length ? use.reduce((x, e) => x + e.liters, 0) / use.length : null;
+  }
   function renderPrices() {
     const P = state.pr;
+    const avgL = avgLitersPerTank(), lInp = el("pr-liters"), lBtn = el("pr-avgL");
+    if (avgL != null && !P.litersTouched && document.activeElement !== lInp) lInp.value = f1.format(avgL);
+    lBtn.hidden = avgL == null;
+    if (avgL != null) lBtn.textContent = "Gemiddeld per tankbeurt: " + f1.format(avgL) + " L" + (P.litersTouched ? ". Gebruiken" : "");
     el("pr-where").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.where === P.where)));
     el("pr-type").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.type === P.type)));
     el("pr-rad").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.rad) === P.rad)));
@@ -2133,7 +2145,8 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     });
   });
   el("pr-go").addEventListener("click", fetchPrices);
-  el("pr-liters").addEventListener("input", renderPrices);
+  el("pr-liters").addEventListener("input", () => { state.pr.litersTouched = true; renderPrices(); });
+  el("pr-avgL").addEventListener("click", () => { state.pr.litersTouched = false; renderPrices(); });
   el("prKeySave").addEventListener("click", () => {
     const k = el("pr-key").value.trim();
     if (!k) { el("prKeyErr").textContent = "Plak eerst je sleutel."; return; }
