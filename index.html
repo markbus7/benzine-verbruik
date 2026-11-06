@@ -340,7 +340,7 @@ input[aria-invalid="true"] { border-color: var(--bad); }
 .per-avg b { font-weight: 600; }
 .per-list { display: grid; }
 .per-row {
-  display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1.6fr) minmax(0, 0.95fr) minmax(0, 0.75fr);
+  display: grid; grid-template-columns: minmax(0, 1.2fr) 2.2rem minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 0.7fr);
   gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); font-variant-numeric: tabular-nums;
 }
 .per-row.head { border-top: 0; padding-top: 0; color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
@@ -351,6 +351,8 @@ input[aria-invalid="true"] { border-color: var(--bad); }
 .per-row .num { font-size: 0.9rem; text-align: right; }
 .per-row.head .num { text-align: right; font-family: inherit; font-size: 0.72rem; }
 .per-row .num { white-space: nowrap; }
+.per-row .p-n { text-align: center; font-family: var(--font-data); font-size: 0.9rem; }
+.per-row.head .p-n { font-family: inherit; font-size: 0.72rem; }
 .per-row .p-label small { white-space: nowrap; }
 
 /* Vinkje volle tank */
@@ -432,7 +434,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     <div>
       <h1>Tank<span>boek</span></h1>
       <p class="sub"><strong class="car">Mazda 2 Touring · 2007</strong> · Vul na elke tankbeurt in hoeveel je getankt en gereden hebt.</p>
-      <p class="ver" id="versie">Versie 1.11 · 6 nov 2026</p>
+      <p class="ver" id="versie">Versie 1.12 · 6 nov 2026</p>
     </div>
     <span class="status" id="status" data-state="">Laden…</span>
   </header>
@@ -1373,7 +1375,8 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
         } else {
           key = d.getFullYear() * 100 + d.getMonth(); label = monthFmt.format(d);
         }
-        const b = map.get(key) || { key, label, sub, km: 0, l: 0, cost: 0, hasCost: false, est: false };
+        const b = map.get(key) || { key, label, sub, km: 0, l: 0, cost: 0, hasCost: false, est: false, n: 0 };
+        if (k === 0) b.n++;
         b.km += e.km / days; b.l += e.liters / days;
         if (cost != null) { b.cost += cost / days; b.hasCost = true; if (est) b.est = true; }
         map.set(key, b);
@@ -1384,6 +1387,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     return {
       list,
       avgKm: daysCovered ? (tKm / daysCovered) * per : null,
+      avgN: daysCovered ? (rows.length / daysCovered) * per : null,
       avgCost: daysCovered && anyCost ? (tCost / daysCovered) * per : null
     };
   }
@@ -1394,14 +1398,16 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     const mode = state.perMode, r = periodBuckets(rows, mode);
     card.querySelectorAll(".per-seg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.per === mode)));
     el("perAvg").innerHTML = "Gemiddeld per " + mode + ": <b class=\"num\">" + f0.format(r.avgKm) + " km</b>" +
-      (r.avgCost != null ? " en <b class=\"num\">" + eur.format(r.avgCost) + "</b>" : "");
+      (r.avgCost != null ? ", <b class=\"num\">" + eur.format(r.avgCost) + "</b>" : "") +
+      (r.avgN != null ? " en " + f1.format(r.avgN) + (Math.abs(r.avgN - 1) < 0.05 ? " tankbeurt" : " tankbeurten") : "");
     const shown = r.list.slice(0, mode === "week" ? 8 : 12);
     const max = Math.max.apply(null, shown.map((b) => b.km));
     let anyEst = false;
-    el("perList").innerHTML = '<div class="per-row head"><span>' + (mode === "week" ? "Week" : "Maand") + '</span><span>Km</span><span class="num">Kosten</span><span class="num">L/100</span></div>' +
+    el("perList").innerHTML = '<div class="per-row head"><span>' + (mode === "week" ? "Week" : "Maand") + '</span><span class="p-n" title="Tankbeurten">Tank</span><span>Km</span><span class="num">Kosten</span><span class="num">L/100</span></div>' +
       shown.map((b) => {
         if (b.est) anyEst = true;
         return '<div class="per-row"><span class="p-label">' + b.label + (b.sub ? "<small>" + b.sub + "</small>" : "") + "</span>" +
+          '<span class="p-n" aria-label="' + b.n + (b.n === 1 ? ' tankbeurt' : ' tankbeurten') + '">' + (b.n || "–") + "</span>" +
           '<span class="per-km">' + f0.format(b.km) + '<i style="width:' + (max > 0 ? Math.max(2, (b.km / max) * 100) : 0).toFixed(1) + '%"></i></span>' +
           '<span class="num">' + (b.hasCost ? (b.est ? "≈ " : "") + eur.format(b.cost).replace(/\s/g, " ") : "–") + "</span>" +
           '<span class="num">' + (b.km > 0 ? f1.format((b.l / b.km) * 100) : "–") + "</span></div>";
