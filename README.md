@@ -17,6 +17,7 @@ Open `index.html` in je browser. Je ziet dan:
 - gemaakt voor de telefoon: tabbladen onderaan binnen duimbereik, grote knoppen en velden, onderhoud dat inklapt en vanzelf opent als er iets moet, een logboek met de laatste 5 tankbeurten en een bevestiging na het opslaan
 - tank je een keer niet vol (bijvoorbeeld om in Duitsland bij te tanken), haal dan het vinkje "Tank helemaal vol" weg: die liters en kilometers tellen mee bij je volgende volle tank
 - tabblad **Prijzen**: actuele prijzen van Duitse tankstations in de buurt (via Tankerkönig, gratis sleutel nodig), met de netto besparing tegenover je laatste literprijs na aftrek van het omrijden. Voor Nederland is er geen gratis bron met actuele prijzen
+- vul bij een tankbeurt de dagteller in, of de kilometerstand van je teller: dan rekent het Tankboek zelf uit hoeveel je sinds de vorige tankbeurt gereden hebt, en de stand bij eerdere tankbeurten terug
 
 In deze losse versie worden je tankbeurten in je browser bewaard (localStorage).
 
@@ -38,6 +39,7 @@ Je tankbeurten staan dan in `data/tankbeurten.json` in die privé-repository en 
 
 Het versienummer staat bovenaan de pagina, onder de naam van de auto. Zo zie je of GitHub Pages de nieuwste versie toont.
 
+- **1.14** (8 nov 2026): kilometerstand invullen in plaats van de dagteller; het Tankboek rekent de gereden km uit en de stand bij eerdere tankbeurten terug
 - **1.13** (6 nov 2026): bij Prijzen staat "Ik tank ongeveer" standaard op je gemiddelde aantal liters per tankbeurt
 - **1.12** (6 nov 2026): aantal tankbeurten per week en per maand
 - **1.11** (6 nov 2026): deeltank (niet volgetankt) telt mee bij de volgende volle tank; tabblad Prijzen met actuele Duitse tankprijzen via Tankerkönig en de netto besparing tegenover je laatste prijs
