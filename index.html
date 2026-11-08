@@ -437,7 +437,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     <div>
       <h1>Tank<span>boek</span></h1>
       <p class="sub"><strong class="car">Mazda 2 Touring · 2007</strong> · Vul na elke tankbeurt in hoeveel je getankt en gereden hebt.</p>
-      <p class="ver" id="versie">Versie 1.13 · 6 nov 2026</p>
+      <p class="ver" id="versie">Versie 1.14 · 8 nov 2026</p>
     </div>
     <span class="status" id="status" data-state="">Laden…</span>
   </header>
@@ -464,16 +464,28 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
           <label for="f-datum">Datum</label>
           <input type="date" id="f-datum" required>
         </div>
+        <div class="field">
+          <span class="flabel">Kilometers invullen als</span>
+          <div class="per-seg" id="kmMode" role="group" aria-label="Kilometers invullen als">
+            <button type="button" data-km="dag" aria-pressed="true">Dagteller</button>
+            <button type="button" data-km="stand" aria-pressed="false">Kilometerstand</button>
+          </div>
+        </div>
         <div class="two">
           <div class="field">
             <label for="f-liters">Getankt</label>
             <div class="input-unit"><input type="text" inputmode="decimal" id="f-liters" placeholder="42,5" autocomplete="off"><span>L</span></div>
           </div>
-          <div class="field">
-            <label for="f-km">Gereden</label>
+          <div class="field" id="standField" hidden>
+            <label for="f-stand">Kilometerstand</label>
+            <div class="input-unit"><input type="text" inputmode="numeric" id="f-stand" placeholder="187.432" autocomplete="off"><span>km</span></div>
+          </div>
+          <div class="field" id="kmField">
+            <label for="f-km" id="kmLabel">Gereden</label>
             <div class="input-unit"><input type="text" inputmode="decimal" id="f-km" placeholder="650" autocomplete="off"><span>km</span></div>
           </div>
         </div>
+        <p class="hint" id="standHint" hidden></p>
         <div class="field">
           <label for="f-prijs">Literprijs <span class="opt">(optioneel)</span></label>
           <div class="input-unit"><input type="text" inputmode="decimal" id="f-prijs" placeholder="1,989" autocomplete="off"><span>€/L</span></div>
@@ -492,7 +504,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
           <button class="btn primary" type="submit" id="saveBtn">Tankbeurt opslaan</button>
           <button class="btn ghost" type="button" id="cancelBtn" hidden>Annuleren</button>
         </div>
-        <p class="hint">Gereden km = de kilometers sinds de vorige tankbeurt (je dagteller). Tank je een keer niet vol, haal dan het vinkje weg.</p>
+        <p class="hint">Vul de dagteller in (gereden sinds de vorige tankbeurt) of de kilometerstand van je teller. Tank je een keer niet vol, haal dan het vinkje weg.</p>
       </form>
     </section>
 
@@ -969,6 +981,15 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
   }
   const lp100 = (e) => (e.liters / e.km) * 100;
 
+  // Kilometerstand per tankbeurt: ingevuld, of teruggerekend vanuit de dichtstbijzijnde ingevulde stand.
+  function standen(rows) {
+    const v = rows.map((e) => (e.stand > 0 ? e.stand : null));
+    for (let i = rows.length - 1; i > 0; i--) if (v[i] != null && v[i - 1] == null) v[i - 1] = v[i] - rows[i].km;
+    for (let i = 1; i < rows.length; i++) if (v[i] == null && v[i - 1] != null) v[i] = v[i - 1] + rows[i].km;
+    const res = new Map();
+    rows.forEach((e, i) => { if (v[i] != null) res.set(e.id, { stand: Math.round(v[i]), ingevuld: e.stand > 0 }); });
+    return res;
+  }
   // Een deeltank (vol === false) heeft geen eigen verbruik: de liters en km tellen mee bij de volgende volle tank.
   const isVol = (e) => e.vol !== false;
   function stats(rows) {
@@ -1039,6 +1060,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     renderFluids(real);
     renderStationChips();
     updatePrijsHint();
+    renderKmMode();
     renderTrip();
 
     renderKpis(s, rows, state.mode === "loading");
@@ -1086,6 +1108,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     if (state.mode === "loading") { ul.innerHTML = '<li class="empty-log">Tankbeurten laden…</li>'; return; }
     if (!s.rows.length) { ul.innerHTML = '<li class="empty-log">Nog niets ingevuld.</li>'; return; }
     const byId = new Map(s.points.map((p) => [p.e.id, p]));
+    const stMap = sample ? new Map() : standen(s.rows);
     const all = s.rows.slice().reverse();
     const html = (state.logAll ? all : all.slice(0, 5)).map((e) => {
       const p = byId.get(e.id);
@@ -1106,6 +1129,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
         '<span class="eff">' + (p ? '<span class="num">' + f1.format(p.verbruik) + "</span><small>L/100 km</small>" : "") + chip + "</span>" +
         '<span class="det"><span class="num">' + f2.format(e.liters) + " L</span>" +
         '<span class="num">' + f0.format(e.km) + " km</span>" +
+        (stMap.has(e.id) ? '<span class="num">stand ' + f0.format(stMap.get(e.id).stand) + "</span>" : "") +
         (p ? '<span class="num">1 op ' + f1.format(100 / p.verbruik) + "</span>" + (p.parts ? "<span>met " + p.parts + (p.parts === 1 ? " deeltank" : " deeltanks") + "</span>" : "") : "<span>telt mee bij de volgende volle tank</span>") +
         (e.prijs > 0 ? '<span class="num">€ ' + f3.format(e.prijs) + "/L</span>" + '<span class="num">' + eur.format(e.liters * e.prijs) + "</span>" : "") +
         (e.station ? "<span>" + esc(e.station) + "</span>" : "") +
@@ -1859,14 +1883,54 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
   const fDatum = el("f-datum"), fLiters = el("f-liters"), fKm = el("f-km"), fPrijs = el("f-prijs"), fStation = el("f-station");
   fDatum.value = todayIso();
 
+  // Kilometerstand: gereden km = stand min de stand bij de vorige tankbeurt.
+  state.kmMode = "dag";
+  try { if (localStorage.getItem("tankboek.v1.kmmode") === "stand") state.kmMode = "stand"; } catch (e) { /* niets te doen */ }
+  function parseStand(x) {
+    const t = String(x || "").replace(/\s/g, "").split(",")[0].replace(/\D/g, "");
+    return t ? Number(t) : null;
+  }
+  function standContext() {
+    const base = sorted(state.items.filter((x) => x.id !== state.editing)), datum = fDatum.value;
+    // Alleen tankbeurten tot en met deze datum: anders reken je terug over deze tankbeurt heen.
+    const before = base.filter((e) => !datum || e.datum <= datum);
+    const st = standen(before), prev = before.length ? before[before.length - 1] : null;
+    const next = datum ? base.find((e) => e.datum > datum) || null : null;
+    return { prev, prevStand: prev && st.has(prev.id) ? st.get(prev.id).stand : null, next };
+  }
   function readForm() {
-    return { datum: fDatum.value, liters: parseNum(fLiters.value), km: parseNum(fKm.value), prijs: parseNum(fPrijs.value) };
+    const v = { datum: fDatum.value, liters: parseNum(fLiters.value), km: parseNum(fKm.value), prijs: parseNum(fPrijs.value), stand: null, kmFromStand: false, prevStand: null, prev: null, next: null };
+    if (state.kmMode === "stand") {
+      const c = standContext();
+      v.stand = parseStand(el("f-stand").value);
+      v.prevStand = c.prevStand; v.prev = c.prev; v.next = c.next;
+      if (c.prevStand != null) { v.kmFromStand = true; v.km = v.stand != null ? v.stand - c.prevStand : null; }
+    }
+    return v;
+  }
+  function renderKmMode() {
+    const stand = state.kmMode === "stand";
+    el("kmMode").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.km === state.kmMode)));
+    el("standField").hidden = !stand;
+    const hint = el("standHint");
+    if (!stand) { el("kmField").hidden = false; el("kmLabel").textContent = "Gereden"; hint.hidden = true; return; }
+    const v = readForm();
+    el("kmField").hidden = v.prevStand != null;
+    el("kmLabel").textContent = "Dagteller";
+    hint.hidden = false;
+    if (v.prevStand == null) {
+      hint.textContent = "Eerste keer met kilometerstand: vul ook je dagteller in (gereden sinds de vorige tankbeurt). Daarna rekent het Tankboek de kilometers zelf uit.";
+    } else {
+      hint.textContent = "Vorige stand: " + f0.format(v.prevStand) + " km (" + shortFmt.format(toDate(v.prev.datum)) + ")." +
+        (v.stand != null ? (v.km > 0 ? " Gereden: " + f0.format(v.km) + " km." : " Deze stand is niet hoger dan de vorige.") : "");
+    }
   }
   function updatePreview() {
     const v = readForm();
     const pv = el("preview");
     const vol = el("f-vol").checked;
     el("volHint").hidden = vol;
+    renderKmMode();
     if (v.liters > 0 && v.km > 0 && !vol) {
       pv.innerHTML = "Deeltank" + (v.prijs > 0 ? ' · <span class="num">' + eur.format(v.liters * v.prijs) + "</span>" : "") + ". Het verbruik volgt bij je volgende volle tank.";
       return;
@@ -1891,6 +1955,15 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
   }
   [fLiters, fKm, fPrijs].forEach((i) => i.addEventListener("input", () => { i.removeAttribute("aria-invalid"); updatePreview(); updatePrijsHint(); }));
   el("f-vol").addEventListener("change", updatePreview);
+  el("f-stand").addEventListener("input", () => { el("f-stand").removeAttribute("aria-invalid"); updatePreview(); });
+  fDatum.addEventListener("change", updatePreview);
+  el("kmMode").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button[data-km]");
+    if (!b) return;
+    state.kmMode = b.dataset.km;
+    try { localStorage.setItem("tankboek.v1.kmmode", state.kmMode); } catch (e) { /* niets te doen */ }
+    updatePreview();
+  });
   fStation.addEventListener("input", () => { renderStationChips(); updatePrijsHint(); });
   el("stationChips").addEventListener("click", (ev) => {
     const b = ev.target.closest("button[data-station]");
@@ -1907,7 +1980,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
 
   function resetForm() {
     state.editing = null;
-    fLiters.value = ""; fKm.value = ""; fPrijs.value = ""; fStation.value = ""; el("f-vol").checked = true;
+    fLiters.value = ""; fKm.value = ""; fPrijs.value = ""; fStation.value = ""; el("f-vol").checked = true; el("f-stand").value = "";
     renderStationChips(); updatePrijsHint();
     fDatum.value = todayIso();
     el("formTitle").textContent = "Nieuwe tankbeurt";
@@ -1924,9 +1997,19 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     const bad = [];
     if (!v.datum) bad.push([fDatum, "Kies een datum."]);
     if (!(v.liters > 0) || v.liters > 500) bad.push([fLiters, "Vul het aantal getankte liters in, bijvoorbeeld 42,5."]);
-    if (!(v.km > 0) || v.km > 5000) bad.push([fKm, "Vul de gereden kilometers sinds de vorige tankbeurt in."]);
+    const fStand = el("f-stand");
+    let nextFix = null;
+    if (state.kmMode === "stand" && !(v.stand > 0)) bad.push([fStand, "Vul de kilometerstand in, bijvoorbeeld 187.432."]);
+    else if (v.kmFromStand && !(v.km > 0)) bad.push([fStand, "Deze stand is niet hoger dan bij je vorige tankbeurt (" + f0.format(v.prevStand) + " km op " + shortFmt.format(toDate(v.prev.datum)) + "). Klopt de stand of de datum?"]);
+    else if (v.kmFromStand && v.km > 5000) bad.push([fStand, "Dat is " + f0.format(v.km) + " km sinds je vorige tankbeurt. Klopt de stand?"]);
+    else if (!v.kmFromStand && (!(v.km > 0) || v.km > 5000)) bad.push([fKm, state.kmMode === "stand" ? "Vul deze eerste keer ook je dagteller in (gereden sinds de vorige tankbeurt)." : "Vul de gereden kilometers sinds de vorige tankbeurt in."]);
+    if (!bad.length && state.kmMode === "stand" && v.next && v.next.stand > 0) {
+      const nk = v.next.stand - v.stand;
+      if (!(nk > 0)) bad.push([fStand, "Deze stand is hoger dan bij je volgende tankbeurt (" + f0.format(v.next.stand) + " km op " + shortFmt.format(toDate(v.next.datum)) + ")."]);
+      else if (Math.abs(nk - v.next.km) > 0.05) nextFix = Object.assign({}, v.next, { km: nk, gewijzigd: Date.now() });
+    }
     if (Number.isNaN(v.prijs) || (v.prijs != null && (v.prijs <= 0 || v.prijs > 10))) bad.push([fPrijs, "De literprijs klopt niet. Gebruik bijvoorbeeld 1,989 of laat het veld leeg."]);
-    [fDatum, fLiters, fKm, fPrijs].forEach((i) => i.removeAttribute("aria-invalid"));
+    [fDatum, fLiters, fKm, fPrijs, fStand].forEach((i) => i.removeAttribute("aria-invalid"));
     if (bad.length) {
       bad.forEach(([i]) => i.setAttribute("aria-invalid", "true"));
       err.textContent = bad[0][1];
@@ -1943,6 +2026,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
       prijs: v.prijs > 0 ? Math.round(v.prijs * 1000) / 1000 : null,
       station: fStation.value.trim().slice(0, 60),
       vol: el("f-vol").checked,
+      stand: state.kmMode === "stand" && v.stand > 0 ? v.stand : null,
       aangemaakt: old ? old.aangemaakt : Date.now(),
       gewijzigd: Date.now()
     };
@@ -1951,6 +2035,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     err.textContent = "";
     try {
       await saveEntry(entry);
+      if (nextFix) await saveEntry(nextFix);
       resetForm();
       const pt = stats(sorted(state.items.filter((x) => x.id !== entry.id).concat([entry]))).points.find((p) => p.e.id === entry.id);
       showToast(old ? "Wijziging opgeslagen." : !entry.vol ? "Deeltank opgeslagen. Het verbruik volgt bij je volgende volle tank." : "Tankbeurt opgeslagen: " + f1.format(pt ? pt.verbruik : lp100(entry)) + " L/100 km");
@@ -1980,6 +2065,8 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
       fPrijs.value = e.prijs > 0 ? f3.format(e.prijs) : "";
       fStation.value = e.station || "";
       el("f-vol").checked = isVol(e);
+      el("f-stand").value = e.stand > 0 ? f0.format(e.stand) : "";
+      if (e.stand > 0) state.kmMode = "stand";
       renderStationChips(); updatePrijsHint();
       el("formTitle").textContent = "Tankbeurt wijzigen";
       el("saveBtn").textContent = "Wijziging opslaan";
