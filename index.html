@@ -445,7 +445,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     <div>
       <h1>Tank<span>boek</span></h1>
       <p class="sub"><strong class="car">Mazda 2 Touring · 2007</strong> · Vul na elke tankbeurt in hoeveel je getankt en gereden hebt.</p>
-      <p class="ver" id="versie">Versie 1.16 · 8 nov 2026</p>
+      <p class="ver" id="versie">Versie 1.17 · 8 nov 2026</p>
     </div>
     <span class="status" id="status" data-state="">Laden…</span>
   </header>
@@ -617,6 +617,34 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
 
   
 
+
+  <section class="card oil" id="bdCard" aria-labelledby="bdTitle">
+    <div class="card-head fold-head" id="bdHead" role="button" tabindex="0" aria-expanded="false" aria-controls="bdFold"><h2 id="bdTitle">Banden wisselen</h2><span class="fold-sum" id="bdSum"></span><span class="chip flat" id="bdChip">Onbekend</span></div>
+    <div class="fold" id="bdFold" hidden>
+      <p class="oil-main" id="bdMain"></p>
+      <p class="oil-sub" id="bdSub" hidden></p>
+      <div class="field" id="bdNowField" hidden>
+        <span class="flabel">Ik rijd nu op</span>
+        <div class="chips" id="bdNow" role="group" aria-label="Huidige banden">
+          <button type="button" data-set="zomer" aria-pressed="false">Zomerbanden</button>
+          <button type="button" data-set="winter" aria-pressed="false">Winterbanden</button>
+        </div>
+      </div>
+      <div class="oil-actions">
+        <div class="field">
+          <label for="bd-datum">Datum wissel</label>
+          <input type="date" id="bd-datum">
+        </div>
+        <div class="field">
+          <label for="bd-stand">Kilometerstand <span class="opt">(optioneel)</span></label>
+          <div class="input-unit"><input type="text" inputmode="numeric" id="bd-stand" placeholder="202.958" autocomplete="off"><span>km</span></div>
+        </div>
+        <button class="btn primary" type="button" id="bdDone" data-set="winter">Winterbanden erop</button>
+      </div>
+      <p class="err" id="bdErr" role="alert"></p>
+      <p class="hint">Vuistregel in Nederland: van O tot O, oftewel van oktober tot Pasen winterbanden. Een wissel komt ook als notitie in je logboek en als streepje in de grafiek.</p>
+    </div>
+  </section>
 
   <section class="card" aria-labelledby="logTitle">
       <div class="card-head">
@@ -1096,6 +1124,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     renderOil(real);
     renderChange(real);
     renderFluids(real);
+    renderTyres(real);
     renderStationChips();
     updatePrijsHint();
     renderKmMode();
@@ -1519,7 +1548,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
   }
 
   /* ---------- Inklappen, logboek, melding ---------- */
-  state.fold = { oil: null, chg: null, fl: null };
+  state.fold = { oil: null, chg: null, fl: null, bd: null };
   state.logAll = false;
   function setFold(key, attention) {
     const open = state.fold[key] != null ? state.fold[key] : attention;
@@ -1805,6 +1834,66 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     if (name === "reis") renderTrip();
     if (name === "prijs") renderPrices();
     if (focus) el("tab-" + name).focus();
+  }
+
+  /* ---------- Banden wisselen (van O tot O) ---------- */
+  function pasen(y) {
+    const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31), day = ((h + l - 7 * m + 114) % 31) + 1;
+    return y + "-" + String(month).padStart(2, "0") + "-" + String(day).padStart(2, "0");
+  }
+  const tyreType = (n) => {
+    const t = (n.tekst || "").toLowerCase();
+    return t.startsWith("winterbanden erop") ? "winter" : t.startsWith("zomerbanden erop") ? "zomer" : null;
+  };
+  function tyreInfo(real) {
+    const sw = notities().filter((n) => tyreType(n));
+    const cfg = state.items.find((x) => x.id === "instelling-banden") || {};
+    const last = sw.length ? sw[sw.length - 1] : null;
+    const nu = last ? tyreType(last) : cfg.nu || null;
+    const totals = { zomer: 0, winter: 0 };
+    let cur = 0;
+    real.forEach((e) => {
+      let set = null;
+      sw.forEach((n) => { if (n.datum < e.datum) set = tyreType(n); });
+      if (set) totals[set] += e.km;
+      if (last && e.datum > last.datum) cur += e.km;
+    });
+    const today = todayIso(), y = Number(today.slice(0, 4)), winterStart = y + "-10-01", easter = pasen(y);
+    let season, nextChange;
+    if (today >= winterStart) { season = "winter"; nextChange = pasen(y + 1); }
+    else if (today >= easter) { season = "zomer"; nextChange = winterStart; }
+    else { season = "winter"; nextChange = easter; }
+    return { last, nu, totals, cur, season, nextChange, daysToChange: dayDiff(today, nextChange) };
+  }
+  function renderTyres(real) {
+    const t = tyreInfo(real), naam = { zomer: "zomerbanden", winter: "winterbanden" };
+    const st = !t.nu ? "unknown" : t.nu !== t.season ? "due" : t.daysToChange <= 14 ? "soon" : "ok";
+    const chip = el("bdChip");
+    chip.className = "chip " + { unknown: "flat", due: "bad", soon: "warn", ok: "good" }[st];
+    chip.textContent = { unknown: "Onbekend", due: "Nu wisselen", soon: "Binnenkort", ok: "Op tijd" }[st];
+    el("bdSum").textContent = t.nu ? naam[t.nu] : "";
+    el("bdCard").classList.toggle("due", st === "due");
+    setFold("bd", st !== "ok");
+    let main;
+    if (st === "unknown") main = "Op welke banden rijd je nu? Kies het hieronder, of leg een wissel vast.";
+    else if (st === "due") main = "Je rijdt op <b>" + naam[t.nu] + "</b>. " + (t.season === "winter" ? "Het is van O tot O: tijd voor winterbanden." : "Pasen is voorbij: de zomerbanden mogen er weer op.");
+    else main = "Je rijdt op <b>" + naam[t.nu] + "</b>. " + (t.season === "winter"
+      ? "Vanaf Pasen (" + dayFmt.format(toDate(t.nextChange)) + ") mogen de zomerbanden er weer op."
+      : "Vanaf 1 oktober is het tijd voor winterbanden.");
+    el("bdMain").innerHTML = main;
+    const sub = [];
+    if (t.last) sub.push("Gewisseld op " + dayFmt.format(toDate(t.last.datum)) + ", " + f0.format(t.cur) + " km op deze set");
+    if (t.totals.zomer && t.totals.winter) sub.push("Totaal: zomerbanden " + f0.format(t.totals.zomer) + " km, winterbanden " + f0.format(t.totals.winter) + " km");
+    el("bdSub").textContent = sub.length ? sub.join(". ") + "." : "";
+    el("bdSub").hidden = !sub.length;
+    el("bdNowField").hidden = !!t.last;
+    el("bdNow").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.set === t.nu)));
+    const target = t.nu ? (t.nu === "zomer" ? "winter" : "zomer") : t.season;
+    el("bdDone").textContent = naam[target].charAt(0).toUpperCase() + naam[target].slice(1) + " erop";
+    el("bdDone").dataset.set = target;
   }
 
   /* ---------- Grafiek ---------- */
@@ -2283,7 +2372,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
       showTab(TABS[(TABS.indexOf(t) + (ev.key === "ArrowRight" ? 1 : TABS.length - 1)) % TABS.length], true);
     });
   });
-  ["oil", "chg", "fl"].forEach((key) => {
+  ["oil", "chg", "fl", "bd"].forEach((key) => {
     const head = el(key + "Head"), body = el(key + "Fold");
     const toggle = () => { state.fold[key] = body.hidden; setFold(key, false); };
     head.addEventListener("click", toggle);
@@ -2291,6 +2380,22 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     ["pointerdown", "focusin"].forEach((evt) => body.addEventListener(evt, () => { if (state.fold[key] == null) state.fold[key] = true; }));
   });
   el("logMore").addEventListener("click", () => { state.logAll = !state.logAll; render(); });
+  el("bd-datum").value = todayIso();
+  el("bdDone").addEventListener("click", async () => {
+    const set = el("bdDone").dataset.set, datum = el("bd-datum").value, stand = parseStand(el("bd-stand").value);
+    if (!datum) { el("bdErr").textContent = "Kies de datum van de wissel."; return; }
+    const btn = el("bdDone");
+    btn.disabled = true;
+    const ok = await oilSave({ id: newId(), soort: "notitie", datum, tekst: (set === "winter" ? "Winterbanden" : "Zomerbanden") + " erop", stand: stand > 0 ? stand : null, aangemaakt: Date.now(), gewijzigd: Date.now() }, "bdErr");
+    btn.disabled = false;
+    if (ok) el("bd-stand").value = "";
+  });
+  el("bdNow").addEventListener("click", async (ev) => {
+    const b = ev.target.closest("button[data-set]");
+    if (!b) return;
+    const cur = state.items.find((x) => x.id === "instelling-banden");
+    await oilSave(Object.assign({ id: "instelling-banden", soort: "instelling", aangemaakt: Date.now() }, cur, { nu: b.dataset.set, gewijzigd: Date.now() }), "bdErr");
+  });
   function closeNote() { el("noteForm").hidden = true; el("noteAdd").hidden = false; el("noteErr").textContent = ""; }
   el("noteAdd").addEventListener("click", () => {
     el("n-datum").value = todayIso(); el("n-tekst").value = ""; el("n-stand").value = "";
