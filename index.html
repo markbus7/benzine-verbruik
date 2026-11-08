@@ -437,7 +437,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     <div>
       <h1>Tank<span>boek</span></h1>
       <p class="sub"><strong class="car">Mazda 2 Touring · 2007</strong> · Vul na elke tankbeurt in hoeveel je getankt en gereden hebt.</p>
-      <p class="ver" id="versie">Versie 1.14 · 8 nov 2026</p>
+      <p class="ver" id="versie">Versie 1.15 · 8 nov 2026</p>
     </div>
     <span class="status" id="status" data-state="">Laden…</span>
   </header>
@@ -1096,7 +1096,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     const costTile =
       '<div class="kpi"><span class="label">Kosten</span>' +
       '<span class="big num">' + (s.kosten100 != null ? eur.format(s.kosten100).replace(/\s/g, " ") : "–") + "<small>/100 km</small></span>" +
-      '<span class="meta">' + (s.avgPrijs != null ? "Gem. literprijs € " + f3.format(s.avgPrijs) + " · totaal " + eur.format(s.cost) : "Vul een literprijs in om kosten te zien") + "</span></div>";
+      '<span class="meta">' + (s.avgPrijs != null ? "Gem. literprijs € " + f3.format(s.avgPrijs) + "<br>Totaal uitgegeven <span style=\"white-space:nowrap\">" + eur.format(s.cost) + "</span>" : "Vul een literprijs in om kosten te zien") + "</span></div>";
 
     el("kpis").innerHTML = lead + lastTile + l5Tile + costTile;
   }

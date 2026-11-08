@@ -39,6 +39,7 @@ Je tankbeurten staan dan in `data/tankbeurten.json` in die privé-repository en 
 
 Het versienummer staat bovenaan de pagina, onder de naam van de auto. Zo zie je of GitHub Pages de nieuwste versie toont.
 
+- **1.15** (8 nov 2026): in het kostenblok staat nu "Totaal uitgegeven" op een eigen regel
 - **1.14** (8 nov 2026): kilometerstand invullen in plaats van de dagteller; het Tankboek rekent de gereden km uit en de stand bij eerdere tankbeurten terug
 - **1.13** (6 nov 2026): bij Prijzen staat "Ik tank ongeveer" standaard op je gemiddelde aantal liters per tankbeurt
 - **1.12** (6 nov 2026): aantal tankbeurten per week en per maand
