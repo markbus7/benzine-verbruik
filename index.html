@@ -199,6 +199,14 @@ input.text { font-family: var(--font-body); padding-right: 12px; }
 .legend .l-run { width: 18px; height: 3px; background: var(--accent); border-radius: 2px; }
 .legend .l-dot { width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--muted); background: var(--surface); }
 .legend .l-avg { width: 18px; border-top: 2px dashed var(--muted); }
+.legend .l-note { width: 0; height: 12px; border-left: 2px dashed var(--amber); }
+.tip .tnote { display: block; white-space: normal; max-width: 240px; color: var(--bg); margin-top: 4px; }
+.log-head-r { display: inline-flex; align-items: center; gap: 10px; }
+.btn.small { min-height: 38px; padding: 8px 14px; font-size: 0.9rem; }
+.note-form { display: grid; gap: 12px; padding: 14px; margin-bottom: 12px; background: var(--sunk); border-radius: var(--radius); }
+.note-form input { background: var(--surface); }
+.log li.note-row .when { color: var(--amber); }
+.log li.note-row .det span:first-child { color: var(--ink); }
 .tip {
   position: absolute; pointer-events: none;
   background: var(--ink); color: var(--bg);
@@ -437,7 +445,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     <div>
       <h1>Tank<span>boek</span></h1>
       <p class="sub"><strong class="car">Mazda 2 Touring · 2007</strong> · Vul na elke tankbeurt in hoeveel je getankt en gereden hebt.</p>
-      <p class="ver" id="versie">Versie 1.15 · 8 nov 2026</p>
+      <p class="ver" id="versie">Versie 1.16 · 8 nov 2026</p>
     </div>
     <span class="status" id="status" data-state="">Laden…</span>
   </header>
@@ -525,6 +533,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
       <span><i class="l-run"></i>Lopend gemiddelde</span>
       <span><i class="l-dot"></i>Per tankbeurt</span>
       <span><i class="l-avg"></i>Gemiddelde laatste 5</span>
+      <span id="legNote" hidden><i class="l-note"></i>Notitie</span>
     </div>
   </section>
   </div>
@@ -612,8 +621,37 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
   <section class="card" aria-labelledby="logTitle">
       <div class="card-head">
         <h2 id="logTitle">Logboek</h2>
-        <span class="hint" id="logCount"></span>
+        <span class="log-head-r"><span class="hint" id="logCount"></span><button class="btn ghost small" type="button" id="noteAdd">+ Notitie</button></span>
       </div>
+      <form class="note-form" id="noteForm" novalidate hidden>
+        <span class="flabel">Notitie toevoegen</span>
+        <div class="chips" id="noteChips" role="group" aria-label="Snelkeuze notitie">
+          <button type="button">Banden opgepompt</button>
+          <button type="button">Olie bijgevuld</button>
+          <button type="button">Winterbanden erop</button>
+          <button type="button">Zomerbanden erop</button>
+          <button type="button">Onderhoudsbeurt</button>
+        </div>
+        <div class="field">
+          <label for="n-tekst">Tekst</label>
+          <input type="text" class="text" id="n-tekst" maxlength="200" placeholder="Bijvoorbeeld: banden van 1,8 naar 2,4 bar" autocomplete="off">
+        </div>
+        <div class="two">
+          <div class="field">
+            <label for="n-datum">Datum</label>
+            <input type="date" id="n-datum">
+          </div>
+          <div class="field">
+            <label for="n-stand">Kilometerstand <span class="opt">(optioneel)</span></label>
+            <div class="input-unit"><input type="text" inputmode="numeric" id="n-stand" placeholder="202.958" autocomplete="off"><span>km</span></div>
+          </div>
+        </div>
+        <p class="err" id="noteErr" role="alert"></p>
+        <div class="btns">
+          <button class="btn primary" type="submit" id="noteSave">Notitie opslaan</button>
+          <button class="btn ghost" type="button" id="noteCancel">Annuleren</button>
+        </div>
+      </form>
       <ul class="log" id="log"></ul>
       <button class="btn ghost" type="button" id="logMore" hidden></button>
     </section>
@@ -1101,16 +1139,34 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     el("kpis").innerHTML = lead + lastTile + l5Tile + costTile;
   }
 
+  // Notities (bijvoorbeeld "banden opgepompt") staan tussen de tankbeurten en als streepje in de grafiek.
+  function notities() {
+    return state.items.filter((x) => x && x.soort === "notitie" && x.datum)
+      .sort((a, b) => (a.datum < b.datum ? -1 : a.datum > b.datum ? 1 : (a.aangemaakt || 0) - (b.aangemaakt || 0)));
+  }
+  function noteRow(e, sample) {
+    let acts = "";
+    if (!sample && !state.readOnly) {
+      acts = state.confirmDel === e.id
+        ? '<span class="confirm">Verwijderen?</span><button class="link danger" data-act="del-yes" data-id="' + esc(e.id) + '">Ja</button><button class="link" data-act="del-no">Nee</button>'
+        : '<button class="link danger" data-act="del" data-id="' + esc(e.id) + '">Verwijder</button>';
+    }
+    return '<li class="note-row"><span class="when">' + dayFmt.format(toDate(e.datum)) + '</span><span class="eff"><span class="chip warn">Notitie</span></span>' +
+      '<span class="det"><span>' + esc(e.tekst || "") + "</span>" + (e.stand > 0 ? '<span class="num">stand ' + f0.format(e.stand) + "</span>" : "") + "</span>" +
+      '<span class="acts">' + acts + "</span></li>";
+  }
   function renderLog(s, sample) {
     const ul = el("log");
     el("logMore").hidden = true;
     el("logCount").textContent = s.rows.length ? s.rows.length + (s.rows.length === 1 ? " tankbeurt" : " tankbeurten") : "";
     if (state.mode === "loading") { ul.innerHTML = '<li class="empty-log">Tankbeurten laden…</li>'; return; }
-    if (!s.rows.length) { ul.innerHTML = '<li class="empty-log">Nog niets ingevuld.</li>'; return; }
+    const notes = sample ? [] : notities();
+    if (!s.rows.length && !notes.length) { ul.innerHTML = '<li class="empty-log">Nog niets ingevuld.</li>'; return; }
     const byId = new Map(s.points.map((p) => [p.e.id, p]));
     const stMap = sample ? new Map() : standen(s.rows);
-    const all = s.rows.slice().reverse();
+    const all = s.rows.concat(notes).sort((a, b) => (a.datum < b.datum ? 1 : a.datum > b.datum ? -1 : (b.aangemaakt || 0) - (a.aangemaakt || 0)));
     const html = (state.logAll ? all : all.slice(0, 5)).map((e) => {
+      if (e.soort === "notitie") return noteRow(e, sample);
       const p = byId.get(e.id);
       let chip = '<span class="chip flat">Deeltank</span>';
       if (p) {
@@ -1139,7 +1195,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     ul.innerHTML = html;
     const more = el("logMore");
     more.hidden = all.length <= 5;
-    more.textContent = state.logAll ? "Toon minder" : "Toon alle " + all.length + " tankbeurten";
+    more.textContent = state.logAll ? "Toon minder" : "Toon alles (" + all.length + ")";
   }
 
   /* ---------- Oliecheck ---------- */
@@ -1844,6 +1900,18 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     // eindpunt lopend gemiddelde
     const lk = pts.length - 1;
     g += '<circle cx="' + x(lk) + '" cy="' + y(pts[lk].r) + '" r="5.5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/>';
+    const firstD = pts[0].p.e.datum, notes = notities().filter((n) => n.datum >= firstD);
+    notes.forEach((n) => {
+      let k = pts.length - 1;
+      for (let i = 1; i < pts.length; i++) {
+        const a = pts[i - 1].p.e.datum, b2 = pts[i].p.e.datum;
+        if (n.datum <= b2) { const span = dayDiff(a, b2); k = i - 1 + (span > 0 ? Math.max(0, dayDiff(a, n.datum)) / span : 1); break; }
+      }
+      const nx = x(k).toFixed(1);
+      g += '<g><title>' + esc(dayFmt.format(toDate(n.datum)) + ": " + (n.tekst || "Notitie")) + '</title><line x1="' + nx + '" x2="' + nx + '" y1="' + padT + '" y2="' + (padT + ih) + '" stroke="var(--amber)" stroke-width="2" stroke-dasharray="4 4"/>' +
+        '<circle cx="' + nx + '" cy="' + (padT + 4) + '" r="4" fill="var(--amber)"/></g>';
+    });
+    el("legNote").hidden = !notes.length;
     g += '<line id="guide" x1="0" x2="0" y1="' + padT + '" y2="' + (padT + ih) + '" stroke="var(--ink)" stroke-opacity="0.35" stroke-width="1" visibility="hidden"/>';
     svg.innerHTML = g;
     chartGeom = { pts, x, W, padL, padR, y, M };
@@ -1864,7 +1932,9 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     const tip = el("tip");
     tip.innerHTML = "<b>" + dayFmt.format(toDate(pt.p.e.datum)) + "</b>" + (pt.p.e.station ? " · " + esc(pt.p.e.station) : "") + "<br>" +
       "Deze beurt: <b>" + M.fmt(pt.v) + "</b> " + M.unit + "<br>" +
-      "Lopend gem.: <b>" + M.fmt(pt.r) + "</b>";
+      "Lopend gem.: <b>" + M.fmt(pt.r) + "</b>" +
+      notities().filter((n) => n.datum <= pt.p.e.datum && (best === 0 || n.datum > pts[best - 1].p.e.datum))
+        .map((n) => '<span class="tnote">Notitie ' + shortFmt.format(toDate(n.datum)) + ": " + esc(n.tekst || "") + "</span>").join("");
     tip.hidden = false;
     const left = x(best) / scale;
     const top = Math.min(y(pt.v), y(pt.r)) / scale;
@@ -2221,6 +2291,35 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     ["pointerdown", "focusin"].forEach((evt) => body.addEventListener(evt, () => { if (state.fold[key] == null) state.fold[key] = true; }));
   });
   el("logMore").addEventListener("click", () => { state.logAll = !state.logAll; render(); });
+  function closeNote() { el("noteForm").hidden = true; el("noteAdd").hidden = false; el("noteErr").textContent = ""; }
+  el("noteAdd").addEventListener("click", () => {
+    el("n-datum").value = todayIso(); el("n-tekst").value = ""; el("n-stand").value = "";
+    el("noteForm").hidden = false; el("noteAdd").hidden = true; el("n-tekst").focus();
+  });
+  el("noteCancel").addEventListener("click", closeNote);
+  el("noteChips").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button");
+    if (!b) return;
+    const t = el("n-tekst");
+    t.value = t.value.trim() ? b.textContent + ": " + t.value.trim().replace(/^[^:]*:\s*/, "") : b.textContent;
+    t.focus();
+  });
+  el("noteForm").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const tekst = el("n-tekst").value.trim().slice(0, 200), datum = el("n-datum").value, stand = parseStand(el("n-stand").value);
+    if (!tekst) { el("noteErr").textContent = "Schrijf iets op, of kies een snelkeuze."; el("n-tekst").focus(); return; }
+    if (!datum) { el("noteErr").textContent = "Kies een datum."; return; }
+    if (state.mode === "loading") { el("noteErr").textContent = "Even geduld, je tankboek wordt nog geladen."; return; }
+    const btn = el("noteSave");
+    btn.disabled = true;
+    try {
+      await saveEntry({ id: newId(), soort: "notitie", datum, tekst, stand: stand > 0 ? stand : null, aangemaakt: Date.now(), gewijzigd: Date.now() });
+      closeNote();
+      showToast("Notitie opgeslagen.");
+    } catch (e) {
+      el("noteErr").textContent = e && e.code === "invalid_argument" ? "Je kunt in dit tankboek alleen kijken, niet opslaan." : "Opslaan lukte niet. Probeer het opnieuw.";
+    } finally { btn.disabled = false; }
+  });
   el("perCard").querySelectorAll(".per-seg button").forEach((b) => b.addEventListener("click", () => { state.perMode = b.dataset.per; render(); }));
   el("t-zoek").addEventListener("click", zoekRoute);
   [["pr-where", "where"], ["pr-type", "type"], ["pr-rad", "rad"]].forEach((g) => {
