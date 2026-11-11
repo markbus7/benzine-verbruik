@@ -41,6 +41,7 @@ Je tankbeurten staan dan in `data/tankbeurten.json` in die privé-repository en 
 
 Het versienummer staat bovenaan de pagina, onder de naam van de auto. Zo zie je of GitHub Pages de nieuwste versie toont.
 
+- **1.18** (11 nov 2026): notities zichtbaar in het verloop: tik op een oranje streepje, of lees de laatste notities onder de grafiek; het uitlegwolkje blijft op de telefoon staan tot je ergens anders tikt
 - **1.17** (8 nov 2026): blok Banden wisselen met herinnering van O tot O (oktober tot Pasen) en kilometers per set
 - **1.16** (8 nov 2026): notities in het logboek (bijvoorbeeld "banden opgepompt"), met een streepje in de grafiek en uitleg bij de tankbeurt erna
 - **1.15** (8 nov 2026): in het kostenblok staat nu "Totaal uitgegeven" op een eigen regel
