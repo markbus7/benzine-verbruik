@@ -367,6 +367,14 @@ input[aria-invalid="true"] { border-color: var(--bad); }
 .per-row.head .p-n { font-family: inherit; font-size: 0.72rem; }
 .per-row .p-label small { white-space: nowrap; }
 
+/* Foto lezen */
+.scan { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; position: relative; }
+.scan-btn { display: flex; align-items: center; justify-content: center; text-align: center; font-size: 0.9rem; line-height: 1.25; cursor: pointer; }
+.scan.busy { opacity: 0.55; pointer-events: none; }
+.sr-file { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
+.sr-file:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
+input.ocr-fill { border-color: var(--amber) !important; box-shadow: 0 0 0 2px color-mix(in srgb, var(--amber) 35%, transparent); }
+
 /* Vinkje volle tank */
 .check { display: flex; align-items: center; gap: 10px; font-weight: 600; min-height: 44px; cursor: pointer; }
 .check input { width: 22px; height: 22px; min-height: 0; padding: 0; margin: 0; flex: none; accent-color: var(--accent); }
@@ -449,7 +457,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     <div>
       <h1>Tank<span>boek</span></h1>
       <p class="sub"><strong class="car">Mazda 2 Touring · 2007</strong> · Vul na elke tankbeurt in hoeveel je getankt en gereden hebt.</p>
-      <p class="ver" id="versie">Versie 1.18 · 11 nov 2026</p>
+      <p class="ver" id="versie">Versie 1.19 · 18 nov 2026</p>
     </div>
     <span class="status" id="status" data-state="">Laden…</span>
   </header>
@@ -472,6 +480,13 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     <section class="card" aria-labelledby="formTitle">
       <div class="card-head"><h2 id="formTitle">Nieuwe tankbeurt</h2></div>
       <form id="form" novalidate>
+        <div class="scan" id="scanRow">
+          <label class="btn ghost scan-btn" for="scanBon">Foto van bon of pompscherm</label>
+          <input type="file" class="sr-file" id="scanBon" accept="image/*">
+          <label class="btn ghost scan-btn" for="scanKm">Foto van kilometerteller</label>
+          <input type="file" class="sr-file" id="scanKm" accept="image/*">
+        </div>
+        <p class="hint" id="scanInfo" role="status" hidden></p>
         <div class="field">
           <label for="f-datum">Datum</label>
           <input type="date" id="f-datum" required>
@@ -2063,6 +2078,210 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     if (guide) guide.setAttribute("visibility", "hidden");
   }
 
+  /* ---------- Foto lezen (Tesseract, gratis en op je telefoon) ---------- */
+  /* OCR-PARSER-START */
+  // Getallen uit de herkende tekst, met veelgemaakte herkenningsfouten tussen cijfers rechtgezet (O→0, l→1, S→5, B→8).
+  function ocrTokens(text) {
+    const out = [], isNum = (c) => c != null && /[0-9.,]/.test(c), map = { O: "0", o: "0", D: "0", I: "1", l: "1", "|": "1", S: "5", B: "8" };
+    // "63 , 07" → "63,07": spaties rond een komma of punt tussen cijfers weghalen.
+    String(text || "").replace(/(\d)[ \t]*([.,])[ \t]*(\d)/g, "$1$2$3").split(/\r?\n/).forEach((line) => {
+      line.split(/\s+/).forEach((tok) => {
+        if (!/\d/.test(tok)) return;
+        // O/o naast een cijfer is bijna altijd een 0; de andere letters alleen tussen twee cijfers (anders is "26,5l" ineens 26,51).
+        const chars = tok.split("");
+        for (let i = 0; i < chars.length; i++) {
+          const c = chars[i], prev = chars[i - 1], next = chars[i + 1];
+          if ((c === "O" || c === "o") && (/\d/.test(prev || "") || /\d/.test(next || ""))) chars[i] = "0";
+          else if (map[c] && isNum(prev) && isNum(next)) chars[i] = map[c];
+        }
+        const fixed = chars.join("");
+        const re = /\d+(?:[.,]\d+)*/g;
+        let m;
+        while ((m = re.exec(fixed))) {
+          const raw = m[0], last = Math.max(raw.lastIndexOf(","), raw.lastIndexOf("."));
+          const dec = last >= 0 ? raw.length - last - 1 : 0;
+          const val = last >= 0 ? Number(raw.slice(0, last).replace(/[.,]/g, "") + "." + raw.slice(last + 1)) : Number(raw);
+          out.push({ raw, dec, val, int: Number(raw.replace(/[.,]/g, "")), text: line.toLowerCase() });
+        }
+      });
+    });
+    return out;
+  }
+  // Bon of pompscherm: zoek de drie getallen waarvoor liters × literprijs = totaal.
+  function ocrBon(text, stations) {
+    const toks = ocrTokens(text), has = (t, re) => re.test(t.text);
+    const kwL = /liter|ltr|volume|aantal|\bl\b/, kwP = /prijs|price|\/\s*l\b|per\s*l|eur\s*\/|€\s*\//, kwT = /totaal|total|bedrag|betal|amount|\bsom\b/;
+    const L = toks.filter((t) => t.dec >= 1 && t.dec <= 3 && t.val >= 1 && t.val <= 80);
+    const P = toks.filter((t) => t.dec >= 2 && t.dec <= 3 && t.val >= 1 && t.val <= 3.5);
+    const T = toks.filter((t) => t.dec === 2 && t.val >= 2 && t.val <= 300);
+    let best = null;
+    L.forEach((l) => P.forEach((p) => {
+      if (p === l) return;
+      T.forEach((tt) => {
+        if (tt === l || tt === p) return;
+        const err = Math.abs(l.val * p.val - tt.val) / tt.val;
+        if (err > 0.015) return;
+        const score = err - (has(l, kwL) ? 0.01 : 0) - (has(p, kwP) ? 0.01 : 0) - (has(tt, kwT) ? 0.01 : 0) - (p.dec === 3 ? 0.005 : 0) - (l.dec === 2 ? 0.002 : 0);
+        if (!best || score < best.score) best = { score, l, p, t: tt };
+      });
+    }));
+    const r = {};
+    if (best) { r.liters = best.l.val; r.prijs = best.p.val; r.totaal = best.t.val; r.zeker = true; }
+    else {
+      const pick = (arr, re) => arr.find((t) => has(t, re));
+      const l = pick(L, kwL), p = pick(P, kwP) || P.find((t) => t.dec === 3), tt = pick(T, kwT);
+      if (l) r.liters = l.val;
+      if (p) r.prijs = p.val;
+      if (tt) r.totaal = tt.val;
+      if (r.liters && r.totaal && !r.prijs) r.prijs = Math.round((r.totaal / r.liters) * 1000) / 1000;
+      if (!r.liters && r.totaal && r.prijs) r.liters = Math.round((r.totaal / r.prijs) * 100) / 100;
+    }
+    const dm = String(text || "").match(/\b(\d{1,2})[-\/.](\d{1,2})[-\/.](20\d{2}|\d{2})\b/);
+    if (dm) {
+      const y = dm[3].length === 2 ? 2000 + Number(dm[3]) : Number(dm[3]), mo = Number(dm[2]), d = Number(dm[1]);
+      if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) r.datum = y + "-" + String(mo).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+    }
+    const low = String(text || "").toLowerCase();
+    (stations || []).some((st) => {
+      const w = st.toLowerCase().split(/\s+/)[0];
+      if (w.length >= 4 && low.includes(w)) { r.station = st; return true; }
+      return false;
+    });
+    return r;
+  }
+  // Kilometerteller: het getal dat past bij je vorige stand, anders het grootste getal.
+  function ocrTeller(text, prevStand) {
+    const toks = ocrTokens(text);
+    const ints = toks.filter((t) => (t.dec === 0 || (t.dec === 3 && t.raw.indexOf(".") >= 0)) && t.int >= 1000 && t.int <= 999999).map((t) => t.int);
+    let stand = null;
+    if (prevStand != null) { const ok = ints.filter((v) => v >= prevStand && v <= prevStand + 5000); if (ok.length) stand = Math.min.apply(null, ok); }
+    if (stand == null && ints.length) { const big = ints.filter((v) => v >= 10000); stand = Math.max.apply(null, big.length ? big : ints); }
+    const trip = toks.find((t) => t.dec === 1 && t.val > 0 && t.val < 2000);
+    return { stand, trip: trip ? trip.val : null };
+  }
+  /* OCR-PARSER-END */
+
+  const TESS = "https://cdn.jsdelivr.net/npm/";
+  let ocrWorker = null, ocrLoading = null, ocrProgress = null;
+  function loadTesseract() {
+    if (window.Tesseract) return Promise.resolve();
+    if (!ocrLoading) ocrLoading = new Promise((res, rej) => {
+      const sc = document.createElement("script");
+      sc.src = TESS + "tesseract.js@5.1.1/dist/tesseract.min.js";
+      sc.onload = res;
+      sc.onerror = () => { ocrLoading = null; sc.remove(); rej(new Error("laden")); };
+      document.head.appendChild(sc);
+    });
+    return ocrLoading;
+  }
+  async function getWorker() {
+    await loadTesseract();
+    if (!ocrWorker) {
+      ocrWorker = window.Tesseract.createWorker("eng", 1, {
+        workerPath: TESS + "tesseract.js@5.1.1/dist/worker.min.js",
+        corePath: TESS + "tesseract.js-core@5.1.1",
+        langPath: TESS + "@tesseract.js-data/eng@1.0.0/4.0.0_best_int",
+        logger: (m) => { if (ocrProgress) ocrProgress(m); }
+      }).catch((e) => { ocrWorker = null; throw e; });
+    }
+    return ocrWorker;
+  }
+  // Foto verkleinen, grijs maken en het contrast oprekken; een donker scherm met lichte cijfers wordt omgedraaid.
+  function prepImage(file) {
+    return new Promise((res, rej) => {
+      const url = URL.createObjectURL(file), img = new Image();
+      img.onload = () => {
+        const sc = Math.min(1, 1800 / Math.max(img.naturalWidth, img.naturalHeight));
+        const w = Math.max(1, Math.round(img.naturalWidth * sc)), h = Math.max(1, Math.round(img.naturalHeight * sc));
+        const c = document.createElement("canvas"); c.width = w; c.height = h;
+        const ctx = c.getContext("2d"); ctx.drawImage(img, 0, 0, w, h);
+        const d = ctx.getImageData(0, 0, w, h), px = d.data, n = w * h, g = new Uint8ClampedArray(n), hist = new Uint32Array(256);
+        let sum = 0;
+        for (let i = 0, j = 0; i < px.length; i += 4, j++) { g[j] = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]; sum += g[j]; hist[g[j]]++; }
+        let lo = 0, hi = 255, acc = 0;
+        for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc > n * 0.02) { lo = v; break; } }
+        acc = 0;
+        for (let v = 255; v >= 0; v--) { acc += hist[v]; if (acc > n * 0.02) { hi = v; break; } }
+        const inv = sum / n < 110, span = Math.max(1, hi - lo);
+        for (let i = 0, j = 0; i < px.length; i += 4, j++) {
+          let v = ((g[j] - lo) * 255) / span;
+          v = v < 0 ? 0 : v > 255 ? 255 : v;
+          if (inv) v = 255 - v;
+          px[i] = px[i + 1] = px[i + 2] = v;
+        }
+        ctx.putImageData(d, 0, 0);
+        URL.revokeObjectURL(url);
+        res(c);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); rej(new Error("foto")); };
+      img.src = url;
+    });
+  }
+  function markFilled(inp) { inp.classList.add("ocr-fill"); }
+  document.addEventListener("input", (ev) => { if (ev.target && ev.target.classList) ev.target.classList.remove("ocr-fill"); });
+  async function scanPhoto(kind, file) {
+    const info = el("scanInfo"), row = el("scanRow");
+    info.hidden = false;
+    info.textContent = "Foto lezen… De foto blijft op je telefoon. De eerste keer duurt het iets langer.";
+    row.classList.add("busy");
+    try {
+      const canvas = await prepImage(file);
+      ocrProgress = (m) => {
+        if (m.status === "recognizing text") info.textContent = "Foto lezen… " + Math.round((m.progress || 0) * 100) + "%";
+        else if (/load|initializ/.test(m.status || "")) info.textContent = "Tekstherkenning laden… (alleen de eerste keer)";
+      };
+      const w = await getWorker();
+      const read = async (psm) => {
+        await w.setParameters({ tessedit_pageseg_mode: psm });
+        const res = await w.recognize(canvas);
+        return (res && res.data && res.data.text) || "";
+      };
+      if (kind === "km") applyTeller(ocrTeller(await read("11"), standContext().prevStand));
+      else {
+        // Eerst als bon (regels tekst); klopt de som niet, dan nog eens als scherm met losse getallen.
+        const t1 = await read("6");
+        let r = ocrBon(t1, stationOpties());
+        if (!r.zeker) r = ocrBon(t1 + "\n" + (await read("11")), stationOpties());
+        applyBon(r);
+      }
+    } catch (e) {
+      info.textContent = e && e.message === "foto" ? "Deze foto kan ik niet openen. Probeer een andere foto."
+        : "Foto lezen lukt hier niet. Het werkt in de versie op GitHub Pages en heeft de eerste keer internet nodig om de tekstherkenning te laden.";
+    } finally {
+      row.classList.remove("busy");
+      ocrProgress = null;
+    }
+  }
+  function applyBon(r) {
+    const found = [], info = el("scanInfo");
+    if (r.liters) { fLiters.value = f2.format(r.liters); markFilled(fLiters); found.push(f2.format(r.liters) + " L"); }
+    if (r.prijs) { fPrijs.value = f3.format(r.prijs); markFilled(fPrijs); found.push("€ " + f3.format(r.prijs) + " per liter"); }
+    if (r.totaal) found.push("totaal € " + f2.format(r.totaal));
+    if (r.datum && r.datum <= todayIso() && dayDiff(r.datum, todayIso()) <= 365) { fDatum.value = r.datum; markFilled(fDatum); found.push(dayFmt.format(toDate(r.datum))); }
+    if (r.station && !fStation.value.trim()) { fStation.value = r.station; renderStationChips(); found.push(r.station); }
+    updatePreview(); updatePrijsHint();
+    info.textContent = !found.length
+      ? "Ik kon geen liters of prijs vinden op deze foto. Probeer een scherpe foto, recht van voren en zonder schittering, of vul het zelf in."
+      : "Gevonden: " + found.join(", ") + "." + (r.zeker ? "" : " Niet alles was goed leesbaar.") + " Controleer de oranje velden" + (fKm.value || el("f-stand").value ? "" : ", vul de kilometers in") + " en tik dan op opslaan.";
+  }
+  function applyTeller(r) {
+    const info = el("scanInfo");
+    if (!r.stand) {
+      info.textContent = "Ik kon geen kilometerstand vinden. Zorg dat de teller scherp en goed verlicht in beeld is, of vul het zelf in.";
+      return;
+    }
+    if (state.kmMode !== "stand") {
+      state.kmMode = "stand";
+      try { localStorage.setItem("tankboek.v1.kmmode", "stand"); } catch (e) { /* niets te doen */ }
+    }
+    el("f-stand").value = f0.format(r.stand);
+    markFilled(el("f-stand"));
+    updatePreview();
+    let extra = "";
+    if (r.trip != null && !el("kmField").hidden && !fKm.value) { fKm.value = f1.format(r.trip); markFilled(fKm); extra = " en dagteller " + f1.format(r.trip) + " km"; updatePreview(); }
+    info.textContent = "Kilometerstand " + f0.format(r.stand) + " km gevonden" + extra + ". Controleer het oranje veld voor je opslaat.";
+  }
+
   /* ---------- Formulier ---------- */
   const fDatum = el("f-datum"), fLiters = el("f-liters"), fKm = el("f-km"), fPrijs = el("f-prijs"), fStation = el("f-station");
   fDatum.value = todayIso();
@@ -2139,6 +2358,11 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
   }
   [fLiters, fKm, fPrijs].forEach((i) => i.addEventListener("input", () => { i.removeAttribute("aria-invalid"); updatePreview(); updatePrijsHint(); }));
   el("f-vol").addEventListener("change", updatePreview);
+  [["scanBon", "bon"], ["scanKm", "km"]].forEach((x) => el(x[0]).addEventListener("change", (ev) => {
+    const f = ev.target.files && ev.target.files[0];
+    ev.target.value = "";
+    if (f) scanPhoto(x[1], f);
+  }));
   el("f-stand").addEventListener("input", () => { el("f-stand").removeAttribute("aria-invalid"); updatePreview(); });
   fDatum.addEventListener("change", updatePreview);
   el("kmMode").addEventListener("click", (ev) => {
@@ -2165,6 +2389,8 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
   function resetForm() {
     state.editing = null;
     fLiters.value = ""; fKm.value = ""; fPrijs.value = ""; fStation.value = ""; el("f-vol").checked = true; el("f-stand").value = "";
+    document.querySelectorAll(".ocr-fill").forEach((i) => i.classList.remove("ocr-fill"));
+    el("scanInfo").hidden = true;
     renderStationChips(); updatePrijsHint();
     fDatum.value = todayIso();
     el("formTitle").textContent = "Nieuwe tankbeurt";
