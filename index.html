@@ -396,6 +396,14 @@ input.ocr-fill { border-color: var(--amber) !important; box-shadow: 0 0 0 2px co
 .sync-body a { overflow-wrap: anywhere; }
 .hint a { color: var(--accent); font-weight: 600; }
 
+/* Liters per tankbeurt en zoeken */
+.ts-item .ts-sub { color: var(--muted); font-size: 0.78rem; }
+.ts-item { align-content: start; }
+.log-search { display: flex; gap: 8px; margin-bottom: 8px; }
+.log-search input { flex: 1; min-width: 0; padding-right: 12px; }
+.log-search input::-webkit-search-cancel-button { display: none; }
+.log mark { background: color-mix(in srgb, var(--amber) 35%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+
 /* Tankinhoud */
 .tankstrip { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 16px 12px; display: grid; gap: 6px; }
 .ts-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; align-items: baseline; }
@@ -457,7 +465,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     <div>
       <h1>Tank<span>boek</span></h1>
       <p class="sub"><strong class="car">Mazda 2 Touring · 2007</strong> · Vul na elke tankbeurt in hoeveel je getankt en gereden hebt.</p>
-      <p class="ver" id="versie">Versie 1.19 · 18 nov 2026</p>
+      <p class="ver" id="versie">Versie 1.20 · 19 nov 2026</p>
     </div>
     <span class="status" id="status" data-state="">Laden…</span>
   </header>
@@ -475,6 +483,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
 
   <section class="kpis" id="kpis" aria-label="Kerncijfers"></section>
   <section class="tankstrip" id="tankStrip" aria-label="Wat een tank kost" hidden></section>
+  <section class="tankstrip" id="litersStrip" aria-label="Liters per tankbeurt" hidden></section>
 
   <div class="cols">
     <section class="card" aria-labelledby="formTitle">
@@ -670,6 +679,10 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
       <div class="card-head">
         <h2 id="logTitle">Logboek</h2>
         <span class="log-head-r"><span class="hint" id="logCount"></span><button class="btn ghost small" type="button" id="noteAdd">+ Notitie</button></span>
+      </div>
+      <div class="log-search" id="logSearchRow" hidden>
+        <input type="search" class="text" id="logSearch" placeholder="Zoek op datum, station, liters, prijs of notitie" autocomplete="off" enterkeyhint="search" aria-label="Zoeken in het logboek">
+        <button type="button" class="btn ghost small" id="logSearchClear" hidden>Wissen</button>
       </div>
       <form class="note-form" id="noteForm" novalidate hidden>
         <span class="flabel">Notitie toevoegen</span>
@@ -1152,6 +1165,7 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
 
     renderKpis(s, rows, state.mode === "loading");
     renderTank(s, rows);
+    renderLiters(rows);
     renderPeriods(rows);
     renderLog(s, sample);
     renderChart(s);
@@ -1208,13 +1222,20 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     const ul = el("log");
     el("logMore").hidden = true;
     el("logCount").textContent = s.rows.length ? s.rows.length + (s.rows.length === 1 ? " tankbeurt" : " tankbeurten") : "";
+    el("logSearchRow").hidden = sample || state.mode === "loading" || !(s.rows.length + notities().length > 3 || state.logQ);
     if (state.mode === "loading") { ul.innerHTML = '<li class="empty-log">Tankbeurten laden…</li>'; return; }
     const notes = sample ? [] : notities();
     if (!s.rows.length && !notes.length) { ul.innerHTML = '<li class="empty-log">Nog niets ingevuld.</li>'; return; }
     const byId = new Map(s.points.map((p) => [p.e.id, p]));
     const stMap = sample ? new Map() : standen(s.rows);
     const all = s.rows.concat(notes).sort((a, b) => (a.datum < b.datum ? 1 : a.datum > b.datum ? -1 : (b.aangemaakt || 0) - (a.aangemaakt || 0)));
-    const html = (state.logAll ? all : all.slice(0, 5)).map((e) => {
+    const words = norm(state.logQ).split(/\s+/).filter(Boolean);
+    const found = words.length ? all.filter((e) => { const h = logHay(e, stMap); return words.every((w) => h.indexOf(w) >= 0); }) : all;
+    if (words.length) {
+      el("logCount").textContent = found.length + " van " + all.length;
+      if (!found.length) { ul.innerHTML = '<li class="empty-log">Niets gevonden voor "' + esc(state.logQ.trim()) + '".</li>'; return; }
+    }
+    const html = (words.length || state.logAll ? found : found.slice(0, 5)).map((e) => {
       if (e.soort === "notitie") return noteRow(e, sample);
       const p = byId.get(e.id);
       let chip = '<span class="chip flat">Deeltank</span>';
@@ -1242,8 +1263,9 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
         '<span class="acts">' + acts + "</span></li>";
     }).join("");
     ul.innerHTML = html;
+    if (words.length) markWords(ul, state.logQ);
     const more = el("logMore");
-    more.hidden = all.length <= 5;
+    more.hidden = words.length > 0 || all.length <= 5;
     more.textContent = state.logAll ? "Toon minder" : "Toon alles (" + all.length + ")";
   }
 
@@ -1565,6 +1587,63 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     box.innerHTML = '<div class="ts-head"><span class="label">Tank ' + TANK_L + ' L</span><span class="ts-note">bij ' + f1.format(s.avg) + " L/100 km" +
       (prijs ? " en € " + f3.format(prijs) + " per liter" : "") + "</span></div>" + '<div class="ts-row">' + parts + "</div>";
     box.hidden = false;
+  }
+
+  /* ---------- Liters per tankbeurt: gemiddeld, minste en meeste ---------- */
+  function renderLiters(rows) {
+    const box = el("litersStrip");
+    if (!rows.length) { box.hidden = true; return; }
+    const cost = (e) => (e.prijs > 0 ? e.liters * e.prijs : null);
+    let min = rows[0], max = rows[0], sumL = 0, sumC = 0, nC = 0;
+    rows.forEach((e) => {
+      if (e.liters < min.liters) min = e;
+      if (e.liters > max.liters) max = e;
+      sumL += e.liters;
+      if (cost(e) != null) { sumC += cost(e); nC++; }
+    });
+    const money = (v) => (v != null ? "<b>" + eur.format(v).replace(/\s/g, " ") + "</b>" : '<b class="ts-sub">geen prijs</b>');
+    const item = (name, litersText, c, sub) =>
+      '<div class="ts-item"><span class="ts-name">' + name + "</span><b>" + litersText + "</b>" + money(c) + (sub ? '<span class="ts-sub">' + sub + "</span>" : "") + "</div>";
+    const tag = (e) => dayFmt.format(toDate(e.datum)) + (isVol(e) ? "" : " · deeltank");
+    box.innerHTML = '<div class="ts-head"><span class="label">Liters per tankbeurt</span><span class="ts-note">' + rows.length + (rows.length === 1 ? " tankbeurt" : " tankbeurten") + "</span></div>" +
+      '<div class="ts-row">' +
+      item("Gemiddeld", f1.format(sumL / rows.length) + " L", nC ? sumC / nC : null, "") +
+      item("Minste", f1.format(min.liters) + " L", cost(min), tag(min)) +
+      item("Meeste", f1.format(max.liters) + " L", cost(max), tag(max)) + "</div>";
+    box.hidden = false;
+  }
+
+  /* ---------- Zoeken in het logboek ---------- */
+  state.logQ = "";
+  const norm = (t) => String(t == null ? "" : t).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  function logHay(e, stMap) {
+    if (e.soort === "notitie") return norm(["notitie", dayFmt.format(toDate(e.datum)), e.datum, e.tekst, e.stand > 0 ? e.stand + " " + f0.format(e.stand) : ""].join(" "));
+    const st = stMap.get(e.id);
+    return norm([dayFmt.format(toDate(e.datum)), e.datum, e.station, f2.format(e.liters) + " " + e.liters + " l liter", f0.format(e.km) + " km",
+      e.prijs > 0 ? f3.format(e.prijs) + " " + e.prijs + " " + f2.format(e.liters * e.prijs) : "", isVol(e) ? "" : "deeltank", st ? st.stand + " " + f0.format(st.stand) : ""].join(" "));
+  }
+  // Markeer de gevonden woorden in de tekst van een regel (niet in knoppen en labels).
+  function markWords(root, q) {
+    const words = norm(q).split(/\s+/).filter((w) => w.length > 1 || /\d/.test(w));
+    if (!words.length) return;
+    const re = new RegExp("(" + words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") + ")", "gi");
+    root.querySelectorAll(".when, .det span, .det").forEach((node) => {
+      if (node.querySelector && node.querySelector("span") && node.classList.contains("det")) return;
+      const tw = document.createTreeWalker(node, NodeFilter.SHOW_TEXT), list = [];
+      while (tw.nextNode()) list.push(tw.currentNode);
+      list.forEach((t) => {
+        if (t.parentNode.closest("mark")) return;
+        const txt = t.nodeValue;
+        if (!re.test(txt)) { re.lastIndex = 0; return; }
+        re.lastIndex = 0;
+        const frag = document.createDocumentFragment();
+        txt.split(re).forEach((part, i) => {
+          if (i % 2) { const m = document.createElement("mark"); m.textContent = part; frag.appendChild(m); }
+          else if (part) frag.appendChild(document.createTextNode(part));
+        });
+        t.parentNode.replaceChild(frag, t);
+      });
+    });
   }
 
   /* ---------- Inklappen, logboek, melding ---------- */
@@ -2633,6 +2712,8 @@ input { font-size: 16px; padding-top: 12px; padding-bottom: 12px; }
     ["pointerdown", "focusin"].forEach((evt) => body.addEventListener(evt, () => { if (state.fold[key] == null) state.fold[key] = true; }));
   });
   el("logMore").addEventListener("click", () => { state.logAll = !state.logAll; render(); });
+  el("logSearch").addEventListener("input", () => { state.logQ = el("logSearch").value; el("logSearchClear").hidden = !state.logQ; render(); });
+  el("logSearchClear").addEventListener("click", () => { el("logSearch").value = ""; state.logQ = ""; el("logSearchClear").hidden = true; render(); el("logSearch").focus(); });
   el("bd-datum").value = todayIso();
   el("bdDone").addEventListener("click", async () => {
     const set = el("bdDone").dataset.set, datum = el("bd-datum").value, stand = parseStand(el("bd-stand").value);

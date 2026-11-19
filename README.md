@@ -21,6 +21,8 @@ Open `index.html` in je browser. Je ziet dan:
 - notities: leg vast wanneer je bijvoorbeeld je banden oppompt of winterbanden laat zetten. Ze staan in het logboek en als oranje streepje in de grafiek, zodat je kunt zien of je verbruik daarna verandert
 - banden wisselen: herinnering voor winterbanden vanaf 1 oktober en zomerbanden vanaf Pasen (van O tot O), met de kilometers per set; een wissel komt ook als notitie in het logboek
 - foto lezen: maak een foto van je bon of het pompscherm (liters, literprijs, datum, station) of van je kilometerteller (stand en dagteller). De foto wordt op je telefoon gelezen met Tesseract en niet bewaard; jij controleert de oranje velden en slaat op
+- liters per tankbeurt: gemiddeld, minste en meeste, met wat dat kostte
+- zoeken in het logboek op datum, station, liters, prijs, kilometerstand of notitie (meerdere woorden tegelijk)
 
 In deze losse versie worden je tankbeurten in je browser bewaard (localStorage).
 
@@ -42,6 +44,7 @@ Je tankbeurten staan dan in `data/tankbeurten.json` in die privé-repository en 
 
 Het versienummer staat bovenaan de pagina, onder de naam van de auto. Zo zie je of GitHub Pages de nieuwste versie toont.
 
+- **1.20** (19 nov 2026): liters per tankbeurt (gemiddeld, minste, meeste, met kosten) en zoeken in het logboek
 - **1.19** (18 nov 2026): foto van bon, pompscherm of kilometerteller vult de velden vooraf in (gratis tekstherkenning op je telefoon)
 - **1.18** (11 nov 2026): notities zichtbaar in het verloop: tik op een oranje streepje, of lees de laatste notities onder de grafiek; het uitlegwolkje blijft op de telefoon staan tot je ergens anders tikt
 - **1.17** (8 nov 2026): blok Banden wisselen met herinnering van O tot O (oktober tot Pasen) en kilometers per set
